@@ -10,7 +10,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --board-size: min(92vw, 55vh);
+  --board-size: min(98vw, 98svh);
   --corner-size: calc(var(--board-size) / 11);
   --side-size: calc((var(--board-size) - 2 * var(--corner-size)) / 9);
   --bg: #0f172a;
@@ -22,10 +22,6 @@
   --accent: #f6d365;
   --green: #4ade80;
   --red: #f87171;
-}
-
-@media (min-width: 768px) {
-  :root { --board-size: min(80vw, 70vh); }
 }
 
 @media (min-width: 1024px) {
@@ -357,22 +353,25 @@ button:active { transform: scale(0.96); }
   border: 2px solid #333;
   border-radius: 8px;
   display: grid;
-  grid-template-areas:
-    "a . b"
-    "c e d"
-    "f . g";
+  grid-template: repeat(3,1fr) / repeat(3,1fr);
   padding: 4px;
   box-shadow: 2px 2px 4px rgba(0,0,0,0.3);
 }
 
-.die .dot {
-  width: 100%;
-  height: 100%;
-  background: #222;
-  border-radius: 50%;
+/* ドットセル */
+.die > div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.die .dot.hidden { background: transparent; }
+.die .dot {
+  width: 30%;
+  height: 30%;
+  background: #222;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
 
 /* ===== サイドパネル ===== */
 #sidePanel {
@@ -402,9 +401,10 @@ button:active { transform: scale(0.96); }
 .player-card {
   background: var(--card-bg);
   border-radius: 12px;
-  padding: 10px;
+  padding: 8px 12px;
   border: 2px solid transparent;
   transition: border-color 0.2s;
+  font-size: 13px;
 }
 
 .player-card.active {
@@ -432,12 +432,13 @@ button:active { transform: scale(0.96); }
 }
 
 .player-card .pc-money {
-  font-size: 0.88rem;
+  font-size: 16px;
   font-weight: 700;
   color: var(--green);
 }
 
-.player-card .pc-pos {
+/* pc-posは使わない */
+.player-card .pc-owned {
   font-size: 0.72rem;
   color: var(--text-muted);
   margin-top: 2px;
@@ -492,40 +493,7 @@ button:disabled {
   transform: none !important;
 }
 
-/* ===== ログ ===== */
-#logContainer {
-  background: var(--card-bg);
-  border-radius: 12px;
-  padding: 10px;
-}
-
-#logContainer h3 {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  margin-bottom: 6px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-#logList {
-  max-height: 120px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.log-entry {
-  font-size: 0.75rem;
-  line-height: 1.4;
-  padding: 2px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.04);
-  color: var(--text-muted);
-}
-
-.log-entry .log-name {
-  font-weight: 700;
-}
+/* ログパネルCSS削除済み */
 
 /* ===== モーダル共通 ===== */
 #modalBackdrop {
@@ -673,13 +641,13 @@ button:disabled {
   to   { opacity: 1; }
 }
 
-@keyframes bounce {
+@keyframes tokenBounce {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-4px); }
 }
 
 .token.moving {
-  animation: bounce 0.3s ease 3;
+  animation: tokenBounce 0.15s ease infinite;
 }
 
 /* ===== スクロールバー ===== */
@@ -737,10 +705,7 @@ button:disabled {
       </div>
       <button id="jailCardBtn" style="display:none">🃏 탈출권 사용</button>
     </div>
-    <div id="logContainer">
-      <h3>📋 기록</h3>
-      <div id="logList"></div>
-    </div>
+    <!-- ログパネルは削除済み -->
   </div>
 </div>
 
@@ -821,9 +786,9 @@ const CHANCE_CARDS_BASE = [
 // ===== プレイヤー設定 =====
 const PLAYER_TEMPLATES = [
   { id:"player", name:"YOU",  isAI:false, color:"#2196F3", emoji:"🔵" },
-  { id:"ai1",    name:"AI-1", isAI:true,  color:"#F44336", emoji:"🔴" },
-  { id:"ai2",    name:"AI-2", isAI:true,  color:"#FFA000", emoji:"🟡" },
-  { id:"ai3",    name:"AI-3", isAI:true,  color:"#4CAF50", emoji:"🟢" },
+  { id:"ai1",    name:"철수", isAI:true,  color:"#F44336", emoji:"🔴" },
+  { id:"ai2",    name:"영희", isAI:true,  color:"#FFA000", emoji:"🟡" },
+  { id:"ai3",    name:"민준", isAI:true,  color:"#4CAF50", emoji:"🟢" },
 ];
 
 // ===== ゲーム状態 =====
@@ -1106,7 +1071,8 @@ function renderPlayers() {
     card.id = "pcard-" + p.id;
     if (idx === gameState.currentPlayerIndex && !p.isBankrupt) card.classList.add("active");
 
-    const sq = gameState.squares[p.position];
+    // 所有地数を計算
+    const ownedCount = gameState.squares.filter(s => s.owner === p.id).length;
     card.innerHTML = `
       <div class="pc-header">
         <span class="pc-emoji">${p.emoji}</span>
@@ -1115,7 +1081,7 @@ function renderPlayers() {
         ${p.inJail ? '<span style="font-size:0.7rem">🔒</span>' : ""}
       </div>
       <div class="pc-money">${W(p.money)}</div>
-      <div class="pc-pos">${sq ? sq.name : ""} (${p.position})</div>
+      <div class="pc-owned">🏙️ ${ownedCount}칸</div>
     `;
     container.appendChild(card);
   });
@@ -1158,23 +1124,9 @@ function updateUI() {
   if (activeCard) activeCard.classList.add("active");
 }
 
-// ===== ログ =====
-const logEntries = [];
+// ===== ログ (UIなし、コンソールのみ) =====
 function addLog(name, msg, color) {
-  logEntries.unshift({ name, msg, color });
-  if (logEntries.length > 50) logEntries.pop();
-  renderLog();
-}
-
-function renderLog() {
-  const list = document.getElementById("logList");
-  list.innerHTML = "";
-  logEntries.slice(0, 20).forEach(e => {
-    const div = document.createElement("div");
-    div.className = "log-entry";
-    div.innerHTML = `<span class="log-name" style="color:${e.color}">[${e.name}]</span> ${e.msg}`;
-    list.appendChild(div);
-  });
+  console.log(`[${name}] ${msg}`);
 }
 
 // ===== ダイスロール =====
@@ -1193,22 +1145,56 @@ function renderDice(d1, d2) {
   renderSingleDie("die2", d2);
 }
 
+// ドットパターン: 位置は [行, 列] (0-indexed, 3x3グリッド)
+// 標準サイコロの点配置に従う
+const DOT_PATTERNS = {
+  1: [[1,1]],
+  2: [[0,0],[2,2]],
+  3: [[0,0],[1,1],[2,2]],
+  4: [[0,0],[0,2],[2,0],[2,2]],
+  5: [[0,0],[0,2],[1,1],[2,0],[2,2]],
+  6: [[0,0],[0,2],[1,0],[1,2],[2,0],[2,2]],
+};
+
 function renderSingleDie(id, val) {
   const die = document.getElementById(id);
-  // ドット配置: 7つの位置 (a,b,c,d,e,f,g)
-  const patterns = {
-    1: [0,0,0,0,1,0,0],
-    2: [1,0,0,0,0,0,1],
-    3: [1,0,0,0,1,0,1],
-    4: [1,1,0,0,0,1,1],
-    5: [1,1,0,0,1,1,1],
-    6: [1,1,1,0,0,1,1], // 位置: a,b,c,d,e,f,g → top-left, top-right, mid-left, mid, mid-right, bot-left, bot-right
-  };
-  // シンプルな数字表示に変更 (小サイズ対応)
-  die.innerHTML = `<span style="grid-column:1/-1;grid-row:1/-1;display:flex;align-items:center;justify-content:center;font-size:1.4em;font-weight:900;color:#222;">${val}</span>`;
-  die.style.display = "flex";
-  die.style.alignItems = "center";
-  die.style.justifyContent = "center";
+  die.innerHTML = "";
+
+  // 3x3セルを生成してドットを配置
+  const positions = DOT_PATTERNS[val] || [];
+  const filled = new Set(positions.map(([r,c]) => r * 3 + c));
+
+  for (let i = 0; i < 9; i++) {
+    const cell = document.createElement("div");
+    if (filled.has(i)) {
+      const dot = document.createElement("div");
+      dot.className = "dot";
+      cell.appendChild(dot);
+    }
+    die.appendChild(cell);
+  }
+}
+
+// サイコロ振りアニメーション (600ms, 80ms間隔)
+function animateDice(finalVal1, finalVal2) {
+  return new Promise(resolve => {
+    const duration = 600;
+    const interval = 80;
+    let elapsed = 0;
+
+    const timer = setInterval(() => {
+      renderSingleDie("die1", Math.ceil(Math.random() * 6));
+      renderSingleDie("die2", Math.ceil(Math.random() * 6));
+      elapsed += interval;
+
+      if (elapsed >= duration) {
+        clearInterval(timer);
+        renderSingleDie("die1", finalVal1);
+        renderSingleDie("die2", finalVal2);
+        resolve();
+      }
+    }, interval);
+  });
 }
 
 // ===== 移動 =====
@@ -1227,6 +1213,31 @@ function movePlayer(player, steps, backwards) {
   }
   renderBoard();
   renderPlayers();
+}
+
+// ===== 1マスずつ移動アニメーション =====
+async function movePlayerStep(player, steps) {
+  // 移動中はトークンにbounceクラスを付与
+  const tokenEl = document.getElementById("token-" + player.id);
+  if (tokenEl) tokenEl.classList.add("moving");
+
+  for (let i = 0; i < steps; i++) {
+    player.position = (player.position + 1) % 40;
+
+    // 出発を通過したか
+    if (player.position === 0 && !player.inJail) {
+      player.money += 200000;
+      addLog(player.name, `출발 통과! +${W(200000)}`, player.color);
+    }
+
+    renderBoard();
+    renderPlayers();
+    await sleep(150);
+  }
+
+  // 移動終了、bounceクラスを削除
+  const tokenElEnd = document.getElementById("token-" + player.id);
+  if (tokenElEnd) tokenElEnd.classList.remove("moving");
 }
 
 // ===== 教도所行き =====
@@ -1300,6 +1311,13 @@ async function handlePurchasable(player, sq) {
     await transferMoney(player, owner, rent);
   } else {
     addLog(player.name, `자신의 소유지: ${sq.name}`, player.color);
+    // 人間プレイヤーが自分の土地に止まった場合、建設推薦ポップアップを表示
+    if (!player.isAI) {
+      const buildTarget = findBestBuildTarget(player);
+      if (buildTarget) {
+        await showBuildRecommendModal(player, buildTarget);
+      }
+    }
   }
 }
 
@@ -1713,10 +1731,16 @@ document.getElementById("rollBtn").addEventListener("click", async () => {
 async function executePlayerTurn(player) {
   gameState.pendingAction = "rolling";
 
+  // ボタン無効化 (移動中操作禁止)
+  document.getElementById("rollBtn").disabled = true;
+  document.getElementById("buildBtn").disabled = true;
+
   if (player.inJail) {
     await handleJailTurn(player);
   } else {
     const { d1, d2, sum, doubles } = rollDice();
+    // サイコロアニメーション
+    await animateDice(d1, d2);
     addLog(player.name, `🎲 ${d1} + ${d2} = ${sum}${doubles ? " (더블!)" : ""}`, player.color);
 
     if (doubles) {
@@ -1731,7 +1755,8 @@ async function executePlayerTurn(player) {
       player.doubleCount = 0;
     }
 
-    movePlayer(player, sum);
+    // 1マスずつ移動
+    await movePlayerStep(player, sum);
     await handleSquareEvent(player);
 
     if (doubles && !player.inJail && gameState.gamePhase === "playing") {
@@ -1753,6 +1778,7 @@ async function executePlayerTurn(player) {
 
 async function handleJailTurn(player) {
   const { d1, d2, sum, doubles } = rollDice();
+  await animateDice(d1, d2);
   addLog(player.name, `🔒 교도소 주사위: ${d1} + ${d2}${doubles ? " (탈출!)" : ""}`, player.color);
 
   if (doubles) {
@@ -1760,7 +1786,7 @@ async function handleJailTurn(player) {
     player.jailTurns = 0;
     player.doubleCount = 0;
     addLog(player.name, "더블로 교도소 탈출! 🎉", player.color);
-    movePlayer(player, sum);
+    await movePlayerStep(player, sum);
     await handleSquareEvent(player);
   } else {
     player.jailTurns++;
@@ -1770,7 +1796,7 @@ async function handleJailTurn(player) {
       await transferMoney(player, null, 50000);
       player.inJail = false;
       player.jailTurns = 0;
-      movePlayer(player, sum);
+      await movePlayerStep(player, sum);
       await handleSquareEvent(player);
     } else {
       addLog(player.name, `교도소 ${player.jailTurns}번째 턴 (최대 3턴)`, player.color);
@@ -1875,6 +1901,59 @@ function aiDecideBuy(player, sq) {
     buyProperty(player, sq);
   } else {
     addLog(player.name, `${sq.name} 구매 포기`, player.color);
+  }
+}
+
+// ===== 建設推薦ポップアップ =====
+// 独占グループの中で最も賃料効率の高い建設対象を1件返す
+function findBestBuildTarget(player) {
+  const groups = {};
+  gameState.squares.forEach(sq => {
+    if (sq.type === "property" && sq.owner === player.id) {
+      if (!groups[sq.group]) groups[sq.group] = [];
+      groups[sq.group].push(sq);
+    }
+  });
+
+  let best = null;
+  let bestEfficiency = 0;
+
+  for (const [group, sqs] of Object.entries(groups)) {
+    const allGroupSqs = SQUARE_DATA.filter(s => s.group === group && s.type === "property");
+    const monopoly = allGroupSqs.every(s => gameState.squares[s.id].owner === player.id);
+    if (!monopoly) continue;
+
+    for (const sq of sqs) {
+      if (sq.hotel) continue;
+      if (player.money < sq.houseCost) continue;
+      const nextLevel = sq.houses + 1;
+      const nextRent = sq.rent[nextLevel] || sq.rent[sq.rent.length - 1];
+      const efficiency = nextRent / sq.houseCost;
+      if (efficiency > bestEfficiency) {
+        bestEfficiency = efficiency;
+        best = sq;
+      }
+    }
+  }
+
+  return best;
+}
+
+// 建設推薦モーダルを表示
+async function showBuildRecommendModal(player, sq) {
+  const nextLevel = sq.houses + 1;
+  const nextRent = sq.rent[nextLevel] || sq.rent[sq.rent.length - 1];
+  const buildLabel = sq.houses === 4 ? "호텔" : `집 ${nextLevel}채`;
+  const result = await showModal(
+    "🏠 건설할 수 있어요!",
+    `<strong>${sq.name}</strong> (그룹${sq.group} 독점 완성)<br>${buildLabel} 건설: <span class="modal-highlight">${W(sq.houseCost)}</span>건설 후 임대료: ${W(nextRent)}`,
+    [
+      { label:"건설하기", cls:"btn-primary" },
+      { label:"나중에",   cls:"btn-secondary" }
+    ]
+  );
+  if (result === "건설하기") {
+    buildOnSquare(player, sq);
   }
 }
 
