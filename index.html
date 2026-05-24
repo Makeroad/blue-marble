@@ -1,0 +1,1902 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>부루마블</title>
+<style>
+/* ===== リセット & ベース ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --board-size: min(92vw, 55vh);
+  --corner-size: calc(var(--board-size) / 11);
+  --side-size: calc((var(--board-size) - 2 * var(--corner-size)) / 9);
+  --bg: #0f172a;
+  --panel-bg: #1e293b;
+  --card-bg: #273549;
+  --border: #334155;
+  --text: #f1f5f9;
+  --text-muted: #94a3b8;
+  --accent: #f6d365;
+  --green: #4ade80;
+  --red: #f87171;
+}
+
+@media (min-width: 768px) {
+  :root { --board-size: min(80vw, 70vh); }
+}
+
+@media (min-width: 1024px) {
+  :root { --board-size: min(calc(100vh - 40px), calc(100vw - 340px)); }
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', -apple-system, Arial, sans-serif;
+  overflow-x: hidden;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  min-height: 48px;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: all 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:active { transform: scale(0.96); }
+
+/* ===== タイトル画面 ===== */
+#titleScreen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%);
+  z-index: 1000;
+  gap: 24px;
+  padding: 24px;
+  animation: fadeIn 0.4s ease;
+}
+
+#titleScreen h1 {
+  font-size: clamp(2.2rem, 8vw, 3.5rem);
+  background: linear-gradient(90deg, #f6d365, #fda085);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 4px;
+  text-align: center;
+}
+
+#titleScreen .subtitle {
+  color: var(--text-muted);
+  font-size: 1rem;
+  letter-spacing: 1px;
+}
+
+.ai-count-label {
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.ai-select {
+  display: flex;
+  gap: 12px;
+}
+
+.ai-btn {
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+  background: var(--panel-bg);
+  border: 2px solid var(--border);
+  color: var(--text);
+  font-size: 1.1rem;
+  font-weight: 700;
+  min-height: unset;
+  transition: all 0.2s ease;
+}
+
+.ai-btn.active {
+  background: linear-gradient(135deg, #f6d365, #fda085);
+  color: #1a1a1a;
+  border-color: transparent;
+  transform: scale(1.08);
+  box-shadow: 0 4px 20px rgba(246,211,101,0.4);
+}
+
+#startBtn {
+  padding: 0 48px;
+  height: 56px;
+  min-height: 56px;
+  background: linear-gradient(135deg, #f6d365, #fda085);
+  color: #1a1a1a;
+  font-size: 1.1rem;
+  font-weight: 700;
+  border-radius: 14px;
+  box-shadow: 0 4px 20px rgba(246,211,101,0.35);
+}
+
+#startBtn:active { transform: scale(0.97); }
+
+/* ===== ゲーム画面 ===== */
+#gameScreen {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+  gap: 10px;
+  min-height: 100vh;
+  padding-bottom: 20px;
+}
+
+@media (min-width: 1024px) {
+  #gameScreen {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 20px;
+    gap: 20px;
+  }
+}
+
+/* ===== ボード ===== */
+#boardWrapper {
+  position: relative;
+  width: var(--board-size);
+  height: var(--board-size);
+  flex-shrink: 0;
+}
+
+#board {
+  position: relative;
+  width: var(--board-size);
+  height: var(--board-size);
+  background: #e8f5e9;
+  border: 2px solid #333;
+  overflow: hidden;
+}
+
+/* ===== マス目 ===== */
+.sq {
+  position: absolute;
+  border: 1px solid #666;
+  background: #f0f8e8;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(var(--corner-size) * 0.14);
+  text-align: center;
+  cursor: default;
+  user-select: none;
+}
+
+.sq .sq-name {
+  font-weight: 700;
+  color: #1a1a1a;
+  line-height: 1.2;
+  padding: 1px 2px;
+  font-size: calc(var(--corner-size) * 0.13);
+  word-break: keep-all;
+}
+
+.sq .sq-price {
+  color: #555;
+  font-size: calc(var(--corner-size) * 0.1);
+  margin-top: 1px;
+}
+
+/* カラーバンド */
+.sq .color-band {
+  position: absolute;
+  background: currentColor;
+}
+
+/* 底辺列 (sq 0-10): バンドは上側 */
+.sq.bottom .color-band {
+  top: 0; left: 0; right: 0;
+  height: 8px;
+}
+
+/* 右辺列 (sq 11-19): バンドは左側 */
+.sq.right-col .color-band {
+  top: 0; left: 0; bottom: 0;
+  width: 8px;
+}
+
+/* 上辺列 (sq 20-30): バンドは下側 */
+.sq.top .color-band {
+  bottom: 0; left: 0; right: 0;
+  height: 8px;
+}
+
+/* 左辺列 (sq 31-39): バンドは右側 */
+.sq.left-col .color-band {
+  top: 0; right: 0; bottom: 0;
+  width: 8px;
+}
+
+/* コーナーマス */
+.sq.corner {
+  background: #dff0d8;
+  font-size: calc(var(--corner-size) * 0.16);
+}
+
+.sq.corner .sq-name {
+  font-size: calc(var(--corner-size) * 0.16);
+}
+
+/* 特殊マス */
+.sq.chance { background: #fff9c4; }
+.sq.tax { background: #fce4ec; }
+.sq.jail-visit { background: #e3f2fd; }
+.sq.go-to-jail { background: #ffccbc; }
+.sq.free-parking { background: #e8f5e9; }
+.sq.airport { background: #e3f2fd; }
+.sq.utility { background: #f3e5f5; }
+.sq.start { background: #c8e6c9; }
+
+/* 所有者インジケーター */
+.sq .owner-badge {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid rgba(0,0,0,0.3);
+}
+
+/* 建物表示 */
+.sq .buildings {
+  display: flex;
+  gap: 1px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+.sq .house {
+  width: 5px;
+  height: 5px;
+  background: #4caf50;
+  border-radius: 1px;
+}
+
+.sq .hotel {
+  width: 10px;
+  height: 6px;
+  background: #f44336;
+  border-radius: 1px;
+}
+
+/* プレイヤートークン */
+.sq .tokens {
+  position: absolute;
+  bottom: 2px;
+  left: 2px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  max-width: 80%;
+}
+
+.token {
+  width: calc(var(--corner-size) * 0.28);
+  height: calc(var(--corner-size) * 0.28);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(var(--corner-size) * 0.16);
+  font-weight: 700;
+  border: 1.5px solid rgba(255,255,255,0.8);
+  color: #fff;
+  text-shadow: 0 0 3px rgba(0,0,0,0.5);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  flex-shrink: 0;
+}
+
+/* ===== 中央エリア ===== */
+#boardCenter {
+  position: absolute;
+  top: var(--corner-size);
+  left: var(--corner-size);
+  width: calc(var(--board-size) - 2 * var(--corner-size));
+  height: calc(var(--board-size) - 2 * var(--corner-size));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: none;
+}
+
+#centerTitle {
+  font-size: calc(var(--board-size) * 0.06);
+  font-weight: 900;
+  background: linear-gradient(135deg, #1565c0, #0d47a1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 2px;
+}
+
+#centerSub {
+  font-size: calc(var(--board-size) * 0.035);
+  color: #555;
+  font-weight: 600;
+}
+
+#diceDisplay {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.die {
+  width: calc(var(--board-size) * 0.07);
+  height: calc(var(--board-size) * 0.07);
+  background: white;
+  border: 2px solid #333;
+  border-radius: 8px;
+  display: grid;
+  grid-template-areas:
+    "a . b"
+    "c e d"
+    "f . g";
+  padding: 4px;
+  box-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+.die .dot {
+  width: 100%;
+  height: 100%;
+  background: #222;
+  border-radius: 50%;
+}
+
+.die .dot.hidden { background: transparent; }
+
+/* ===== サイドパネル ===== */
+#sidePanel {
+  width: 100%;
+  max-width: var(--board-size);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@media (min-width: 1024px) {
+  #sidePanel {
+    width: 300px;
+    max-width: 300px;
+    max-height: calc(var(--board-size));
+    overflow-y: auto;
+  }
+}
+
+/* ===== プレイヤーカード ===== */
+#playersContainer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.player-card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 10px;
+  border: 2px solid transparent;
+  transition: border-color 0.2s;
+}
+
+.player-card.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 12px rgba(246,211,101,0.3);
+}
+
+.player-card.bankrupt {
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+
+.player-card .pc-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.player-card .pc-emoji { font-size: 1.1rem; }
+
+.player-card .pc-name {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.player-card .pc-money {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--green);
+}
+
+.player-card .pc-pos {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ===== アクションボタン ===== */
+#actionArea {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+#actionArea .turn-info {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+#actionArea .btn-row {
+  display: flex;
+  gap: 8px;
+}
+
+#rollBtn {
+  flex: 2;
+  background: linear-gradient(135deg, #f6d365, #fda085);
+  color: #1a1a1a;
+  font-size: 1rem;
+}
+
+#buildBtn {
+  flex: 1;
+  background: var(--panel-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+
+#jailCardBtn {
+  background: var(--panel-bg);
+  color: var(--green);
+  border: 1px solid var(--green);
+  font-size: 0.85rem;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* ===== ログ ===== */
+#logContainer {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+#logContainer h3 {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+#logList {
+  max-height: 120px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.log-entry {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  color: var(--text-muted);
+}
+
+.log-entry .log-name {
+  font-weight: 700;
+}
+
+/* ===== モーダル共通 ===== */
+#modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 500;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+@media (min-width: 768px) {
+  #modalBackdrop {
+    align-items: center;
+  }
+}
+
+#modalBackdrop.open { display: flex; }
+
+.modal-sheet {
+  background: var(--panel-bg);
+  border-radius: 16px 16px 0 0;
+  padding: 24px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 80vh;
+  overflow-y: auto;
+  animation: slideUp 0.25s ease;
+}
+
+@media (min-width: 768px) {
+  .modal-sheet {
+    border-radius: 16px;
+    max-width: 400px;
+  }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(40px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.modal-sheet h2 {
+  font-size: 1.2rem;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.modal-sheet .modal-body {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  text-align: center;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.modal-sheet .modal-highlight {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--accent);
+  display: block;
+  margin: 8px 0;
+}
+
+.modal-sheet .modal-btns {
+  display: flex;
+  gap: 10px;
+}
+
+.modal-sheet .modal-btns button {
+  flex: 1;
+  height: 48px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #f6d365, #fda085);
+  color: #1a1a1a;
+  font-weight: 700;
+}
+
+.btn-secondary {
+  background: var(--card-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-danger {
+  background: #ef4444;
+  color: white;
+  font-weight: 700;
+}
+
+/* ===== 建設モーダル追加スタイル ===== */
+.build-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.build-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card-bg);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.build-item .bi-band {
+  width: 12px;
+  height: 40px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.build-item .bi-info {
+  flex: 1;
+  font-size: 0.85rem;
+}
+
+.build-item .bi-name { font-weight: 700; }
+
+.build-item .bi-status {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.build-item .bi-btn {
+  background: var(--green);
+  color: #1a1a1a;
+  font-size: 0.8rem;
+  padding: 0 14px;
+  height: 38px;
+  min-height: 38px;
+  border-radius: 8px;
+}
+
+/* ===== アニメーション ===== */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.token.moving {
+  animation: bounce 0.3s ease 3;
+}
+
+/* ===== スクロールバー ===== */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+/* ===== ゲームオーバー強調 ===== */
+.gameover-winner {
+  font-size: 2rem;
+  text-align: center;
+  margin: 12px 0;
+}
+</style>
+</head>
+<body>
+
+<!-- ===== タイトル画面 ===== -->
+<div id="titleScreen">
+  <h1>🎲 부루마블</h1>
+  <p class="subtitle">Blue Marble</p>
+  <p class="ai-count-label">AI 인원 선택</p>
+  <div class="ai-select">
+    <button class="ai-btn active" data-count="1">1명</button>
+    <button class="ai-btn" data-count="2">2명</button>
+    <button class="ai-btn" data-count="3">3명</button>
+  </div>
+  <button id="startBtn">게임 시작</button>
+</div>
+
+<!-- ===== ゲーム画面 ===== -->
+<div id="gameScreen">
+  <!-- ボード -->
+  <div id="boardWrapper">
+    <div id="board">
+      <div id="boardCenter">
+        <div id="centerTitle">부루마블</div>
+        <div id="centerSub">BLUE MARBLE</div>
+        <div id="diceDisplay">
+          <div class="die" id="die1"></div>
+          <div class="die" id="die2"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- サイドパネル -->
+  <div id="sidePanel">
+    <div id="playersContainer"></div>
+    <div id="actionArea">
+      <div class="turn-info" id="turnInfo">YOUR TURN</div>
+      <div class="btn-row">
+        <button id="rollBtn">🎲 주사위 굴리기</button>
+        <button id="buildBtn">🏠 건설</button>
+      </div>
+      <button id="jailCardBtn" style="display:none">🃏 탈출권 사용</button>
+    </div>
+    <div id="logContainer">
+      <h3>📋 기록</h3>
+      <div id="logList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== モーダル ===== -->
+<div id="modalBackdrop">
+  <div class="modal-sheet" id="modalSheet">
+    <h2 id="modalTitle"></h2>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-btns" id="modalBtns"></div>
+  </div>
+</div>
+
+<script>
+// ===== マスデータ定義 =====
+const SQUARE_DATA = [
+  { id:0,  name:"출발",    type:"start" },
+  { id:1,  name:"제주도",  type:"property", group:"A", color:"#8B4513", price:60000,  rent:[2000,4000,10000,30000,90000,160000,250000],  houseCost:50000 },
+  { id:2,  name:"찬스",    type:"chance" },
+  { id:3,  name:"부산",    type:"property", group:"A", color:"#8B4513", price:80000,  rent:[4000,8000,20000,60000,180000,450000],         houseCost:50000 },
+  { id:4,  name:"세금 ₩20,000", type:"tax", amount:20000 },
+  { id:5,  name:"인천공항", type:"airport", price:200000, airportRents:[25000,50000,100000,200000] },
+  { id:6,  name:"서울",    type:"property", group:"B", color:"#87CEEB", price:100000, rent:[6000,12000,30000,90000,270000,550000],        houseCost:50000 },
+  { id:7,  name:"찬스",    type:"chance" },
+  { id:8,  name:"대전",    type:"property", group:"B", color:"#87CEEB", price:100000, rent:[6000,12000,30000,90000,270000,550000],        houseCost:50000 },
+  { id:9,  name:"광주",    type:"property", group:"B", color:"#87CEEB", price:120000, rent:[8000,16000,40000,100000,300000,600000],       houseCost:50000 },
+  { id:10, name:"교도소 방문", type:"jail_visit" },
+  { id:11, name:"로마",    type:"property", group:"C", color:"#FF69B4", price:140000, rent:[10000,20000,50000,150000,450000,750000],      houseCost:100000 },
+  { id:12, name:"전력회사", type:"utility",  price:150000 },
+  { id:13, name:"베니스",  type:"property", group:"C", color:"#FF69B4", price:140000, rent:[10000,20000,50000,150000,450000,750000],      houseCost:100000 },
+  { id:14, name:"베를린",  type:"property", group:"C", color:"#FF69B4", price:160000, rent:[12000,24000,60000,180000,500000,900000],      houseCost:100000 },
+  { id:15, name:"런던공항", type:"airport",  price:200000, airportRents:[25000,50000,100000,200000] },
+  { id:16, name:"마드리드", type:"property", group:"D", color:"#FFA500", price:180000, rent:[14000,28000,70000,200000,550000,950000],     houseCost:100000 },
+  { id:17, name:"찬스",    type:"chance" },
+  { id:18, name:"파리",    type:"property", group:"D", color:"#FFA500", price:180000, rent:[14000,28000,70000,200000,550000,950000],      houseCost:100000 },
+  { id:19, name:"뮌헨",    type:"property", group:"D", color:"#FFA500", price:200000, rent:[16000,32000,80000,220000,600000,1000000],     houseCost:100000 },
+  { id:20, name:"무료 주차", type:"free_parking" },
+  { id:21, name:"뉴욕",    type:"property", group:"E", color:"#FF4444", price:220000, rent:[18000,36000,90000,250000,700000,1050000],     houseCost:150000 },
+  { id:22, name:"찬스",    type:"chance" },
+  { id:23, name:"워싱턴",  type:"property", group:"E", color:"#FF4444", price:220000, rent:[18000,36000,90000,250000,700000,1050000],     houseCost:150000 },
+  { id:24, name:"보스턴",  type:"property", group:"E", color:"#FF4444", price:240000, rent:[20000,40000,100000,300000,750000,1100000],    houseCost:150000 },
+  { id:25, name:"뉴욕공항", type:"airport",  price:200000, airportRents:[25000,50000,100000,200000] },
+  { id:26, name:"시드니",  type:"property", group:"F", color:"#FFD700", price:260000, rent:[22000,44000,110000,330000,800000,1150000],    houseCost:150000 },
+  { id:27, name:"도쿄",    type:"property", group:"F", color:"#FFD700", price:260000, rent:[22000,44000,110000,330000,800000,1150000],    houseCost:150000 },
+  { id:28, name:"수도세 ₩20,000", type:"tax", amount:20000 },
+  { id:29, name:"홍콩",    type:"property", group:"F", color:"#FFD700", price:280000, rent:[24000,48000,120000,360000,850000,1200000],    houseCost:150000 },
+  { id:30, name:"교도소 행", type:"go_to_jail" },
+  { id:31, name:"모스크바", type:"property", group:"G", color:"#00AA00", price:300000, rent:[26000,52000,130000,390000,900000,1275000],   houseCost:200000 },
+  { id:32, name:"스톡홀름", type:"property", group:"G", color:"#00AA00", price:300000, rent:[26000,52000,130000,390000,900000,1275000],   houseCost:200000 },
+  { id:33, name:"찬스",    type:"chance" },
+  { id:34, name:"상파울루", type:"property", group:"G", color:"#00AA00", price:320000, rent:[28000,56000,150000,450000,1000000,1400000],  houseCost:200000 },
+  { id:35, name:"카이로공항", type:"airport", price:200000, airportRents:[25000,50000,100000,200000] },
+  { id:36, name:"찬스",    type:"chance" },
+  { id:37, name:"LA",      type:"property", group:"H", color:"#00008B", price:350000, rent:[35000,70000,175000,500000,1100000,1500000],   houseCost:200000 },
+  { id:38, name:"세금 ₩100,000", type:"tax", amount:100000 },
+  { id:39, name:"두바이",  type:"property", group:"H", color:"#00008B", price:400000, rent:[50000,100000,200000,600000,1400000,2000000],  houseCost:200000 },
+];
+
+// ===== チャンスカード =====
+const CHANCE_CARDS_BASE = [
+  { id:1,  text: "출발점으로 이동 (₩200,000 수령)",           action:"moveToStart" },
+  { id:2,  text: "가장 가까운 공항으로 이동",                  action:"moveToNearestAirport" },
+  { id:3,  text: "교도소로 직행",                              action:"goToJail" },
+  { id:4,  text: "교도소 탈출권 획득",                         action:"getJailCard" },
+  { id:5,  text: "은행에서 ₩50,000 수령",                     action:"bankReceive", amount:50000 },
+  { id:6,  text: "은행에서 ₩150,000 수령",                    action:"bankReceive", amount:150000 },
+  { id:7,  text: "은행에 ₩50,000 납부",                       action:"bankPay", amount:50000 },
+  { id:8,  text: "수리비: 집 1채당 ₩40,000, 호텔 1개당 ₩115,000", action:"repairFee" },
+  { id:9,  text: "뒤로 3칸 이동",                             action:"moveBack", steps:3 },
+  { id:10, text: "다음 공항으로 이동, 임대료 2배",              action:"moveToNextAirportDouble" },
+  { id:11, text: "전력회사: 주사위 합 × 10배 납부",            action:"utilityTenX" },
+  { id:12, text: "각 플레이어에게 ₩50,000 지급",               action:"payEachPlayer", amount:50000 },
+  { id:13, text: "각 플레이어에게 ₩50,000 수령",               action:"receiveFromEachPlayer", amount:50000 },
+  { id:14, text: "앞으로 2칸 이동",                            action:"moveForward", steps:2 },
+  { id:15, text: "은행에서 ₩100,000 수령",                    action:"bankReceive", amount:100000 },
+  { id:16, text: "은행에 ₩100,000 납부",                      action:"bankPay", amount:100000 },
+];
+
+// ===== プレイヤー設定 =====
+const PLAYER_TEMPLATES = [
+  { id:"player", name:"YOU",  isAI:false, color:"#2196F3", emoji:"🔵" },
+  { id:"ai1",    name:"AI-1", isAI:true,  color:"#F44336", emoji:"🔴" },
+  { id:"ai2",    name:"AI-2", isAI:true,  color:"#FFA000", emoji:"🟡" },
+  { id:"ai3",    name:"AI-3", isAI:true,  color:"#4CAF50", emoji:"🟢" },
+];
+
+// ===== ゲーム状態 =====
+const gameState = {
+  players: [],
+  squares: [],
+  currentPlayerIndex: 0,
+  chanceCards: [],
+  chanceDiscardPile: [],
+  dice: [0, 0],
+  lastDiceSum: 0,
+  isDoubles: false,
+  gamePhase: "title",
+  pendingAction: null,
+  doubleRentChance: false,
+  aiCount: 1,
+};
+
+// ===== ユーティリティ =====
+const W = (n) => "₩" + n.toLocaleString("ko-KR");
+const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+const shuffle = (arr) => { const a=[...arr]; for(let i=a.length-1;i>0;i--){const j=rand(0,i);[a[i],a[j]]=[a[j],a[i]];} return a; };
+
+// ===== タイトル画面ロジック =====
+document.querySelectorAll(".ai-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".ai-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    gameState.aiCount = parseInt(btn.dataset.count);
+  });
+});
+
+document.getElementById("startBtn").addEventListener("click", () => {
+  document.getElementById("titleScreen").style.display = "none";
+  document.getElementById("gameScreen").style.display = "flex";
+  // レイアウト計算後にボードを構築する
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      initGame(gameState.aiCount);
+    });
+  });
+});
+
+// ===== ゲーム初期化 =====
+function initGame(aiCount) {
+  // プレイヤー作成
+  gameState.players = PLAYER_TEMPLATES.slice(0, 1 + aiCount).map(t => ({
+    ...t,
+    position: 0,
+    money: 1500000,
+    inJail: false,
+    jailTurns: 0,
+    doubleCount: 0,
+    jailCard: false,
+    isBankrupt: false,
+  }));
+
+  // マス状態初期化
+  gameState.squares = SQUARE_DATA.map(sq => ({
+    ...sq,
+    owner: null,
+    houses: 0,
+    hotel: false,
+  }));
+
+  // チャンスカードシャッフル
+  gameState.chanceCards = shuffle([...CHANCE_CARDS_BASE]);
+  gameState.chanceDiscardPile = [];
+
+  gameState.currentPlayerIndex = 0;
+  gameState.dice = [0, 0];
+  gameState.lastDiceSum = 0;
+  gameState.isDoubles = false;
+  gameState.gamePhase = "playing";
+  gameState.pendingAction = null;
+  gameState.doubleRentChance = false;
+
+  buildBoard();
+  renderBoard();
+  renderPlayers();
+  updateUI();
+  addLog("SYSTEM", "게임 시작!", "#888");
+}
+
+// ===== ボード構築 =====
+function buildBoard() {
+  const board = document.getElementById("board");
+  // 既存マス削除 (センターは残す)
+  board.querySelectorAll(".sq").forEach(el => el.remove());
+
+  const bs = getComputedStyle(document.documentElement).getPropertyValue("--board-size");
+  // CSS変数から数値取得は難しいのでJS計算
+  const boardEl = document.getElementById("board");
+  const boardSize = boardEl.offsetWidth || 320;
+  const cornerSize = boardSize / 11;
+  const sideSize = (boardSize - 2 * cornerSize) / 9;
+
+  SQUARE_DATA.forEach((sq, i) => {
+    const el = document.createElement("div");
+    el.className = "sq";
+    el.id = "sq-" + i;
+    el.dataset.sqId = i;
+
+    // 位置・サイズ設定
+    let x, y, w, h, side;
+    if (i <= 10) {
+      // 底辺: 右から左
+      side = "bottom";
+      h = cornerSize;
+      if (i === 0) { x = boardSize - cornerSize; y = boardSize - cornerSize; w = cornerSize; }
+      else if (i === 10) { x = 0; y = boardSize - cornerSize; w = cornerSize; }
+      else { x = boardSize - cornerSize - i * sideSize; y = boardSize - cornerSize; w = sideSize; }
+    } else if (i <= 19) {
+      // 左辺: 下から上
+      side = "left-col";
+      w = cornerSize;
+      y = boardSize - cornerSize - (i - 10) * sideSize;
+      x = 0;
+      h = sideSize;
+    } else if (i <= 30) {
+      // 上辺: 左から右
+      side = "top";
+      h = cornerSize;
+      if (i === 20) { x = 0; y = 0; w = cornerSize; }
+      else if (i === 30) { x = boardSize - cornerSize; y = 0; w = cornerSize; }
+      else { x = (i - 20) * sideSize; y = 0; w = sideSize; }
+    } else {
+      // 右辺: 上から下
+      side = "right-col";
+      w = cornerSize;
+      x = boardSize - cornerSize;
+      y = (i - 30) * sideSize;
+      h = sideSize;
+    }
+
+    // コーナー判定
+    if (i === 0 || i === 10 || i === 20 || i === 30) {
+      el.classList.add("corner");
+    }
+
+    el.classList.add(side);
+    el.style.left = x + "px";
+    el.style.top = y + "px";
+    el.style.width = w + "px";
+    el.style.height = h + "px";
+
+    // タイプ別クラス
+    const typeMap = {
+      chance: "chance", tax: "tax", jail_visit: "jail-visit",
+      go_to_jail: "go-to-jail", free_parking: "free-parking",
+      airport: "airport", utility: "utility", start: "start"
+    };
+    if (typeMap[sq.type]) el.classList.add(typeMap[sq.type]);
+
+    // カラーバンド (property/airport/utility)
+    if ((sq.type === "property" || sq.type === "airport" || sq.type === "utility") && sq.color) {
+      const band = document.createElement("div");
+      band.className = "color-band";
+      band.style.color = sq.color || "#ccc";
+      band.style.background = sq.color || "#ccc";
+      el.appendChild(band);
+    }
+
+    // マス名
+    const nameEl = document.createElement("div");
+    nameEl.className = "sq-name";
+    nameEl.textContent = getSquareIcon(sq) + " " + sq.name;
+    el.appendChild(nameEl);
+
+    // 価格
+    if (sq.price) {
+      const priceEl = document.createElement("div");
+      priceEl.className = "sq-price";
+      priceEl.textContent = W(sq.price);
+      el.appendChild(priceEl);
+    }
+
+    // 所有者バッジ
+    const badge = document.createElement("div");
+    badge.className = "owner-badge";
+    badge.id = "badge-" + i;
+    badge.style.display = "none";
+    el.appendChild(badge);
+
+    // 建物表示
+    const buildings = document.createElement("div");
+    buildings.className = "buildings";
+    buildings.id = "buildings-" + i;
+    el.appendChild(buildings);
+
+    // トークンコンテナ
+    const tokens = document.createElement("div");
+    tokens.className = "tokens";
+    tokens.id = "tokens-" + i;
+    el.appendChild(tokens);
+
+    board.appendChild(el);
+  });
+}
+
+function getSquareIcon(sq) {
+  const icons = { start:"🏁", chance:"❓", tax:"💰", jail_visit:"👀", go_to_jail:"🚔",
+                  free_parking:"🅿", airport:"✈", utility:"⚡" };
+  return icons[sq.type] || "";
+}
+
+// ===== レンダリング =====
+function renderBoard() {
+  const boardEl = document.getElementById("board");
+  const boardSize = boardEl.offsetWidth || 320;
+  const cornerSize = boardSize / 11;
+  const sideSize = (boardSize - 2 * cornerSize) / 9;
+
+  // 全マス更新
+  gameState.squares.forEach((sq, i) => {
+    // 所有者バッジ
+    const badge = document.getElementById("badge-" + i);
+    if (badge) {
+      if (sq.owner) {
+        const owner = PLAYER_TEMPLATES.find(p => p.id === sq.owner);
+        badge.style.background = owner ? owner.color : "#999";
+        badge.style.display = "block";
+      } else {
+        badge.style.display = "none";
+      }
+    }
+
+    // 建物
+    const bEl = document.getElementById("buildings-" + i);
+    if (bEl) {
+      bEl.innerHTML = "";
+      if (sq.hotel) {
+        const h = document.createElement("div");
+        h.className = "hotel";
+        bEl.appendChild(h);
+      } else {
+        for (let j = 0; j < sq.houses; j++) {
+          const h = document.createElement("div");
+          h.className = "house";
+          bEl.appendChild(h);
+        }
+      }
+    }
+  });
+
+  // プレイヤートークン配置
+  // 全トークンクリア
+  document.querySelectorAll(".tokens").forEach(el => el.innerHTML = "");
+
+  // 位置ごとにグループ化
+  const posMap = {};
+  gameState.players.forEach(p => {
+    if (p.isBankrupt) return;
+    if (!posMap[p.position]) posMap[p.position] = [];
+    posMap[p.position].push(p);
+  });
+
+  Object.entries(posMap).forEach(([pos, players]) => {
+    const tokensEl = document.getElementById("tokens-" + pos);
+    if (!tokensEl) return;
+    players.forEach(p => {
+      const tok = document.createElement("div");
+      tok.className = "token";
+      tok.id = "token-" + p.id;
+      tok.style.background = p.color;
+      tok.textContent = p.emoji;
+      tok.style.fontSize = "0.7rem";
+      tokensEl.appendChild(tok);
+    });
+  });
+}
+
+function renderPlayers() {
+  const container = document.getElementById("playersContainer");
+  container.innerHTML = "";
+
+  gameState.players.forEach((p, idx) => {
+    const card = document.createElement("div");
+    card.className = "player-card" + (p.isBankrupt ? " bankrupt" : "");
+    card.id = "pcard-" + p.id;
+    if (idx === gameState.currentPlayerIndex && !p.isBankrupt) card.classList.add("active");
+
+    const sq = gameState.squares[p.position];
+    card.innerHTML = `
+      <div class="pc-header">
+        <span class="pc-emoji">${p.emoji}</span>
+        <span class="pc-name" style="color:${p.color}">${p.name}</span>
+        ${p.jailCard ? '<span style="font-size:0.7rem">🃏</span>' : ""}
+        ${p.inJail ? '<span style="font-size:0.7rem">🔒</span>' : ""}
+      </div>
+      <div class="pc-money">${W(p.money)}</div>
+      <div class="pc-pos">${sq ? sq.name : ""} (${p.position})</div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+// ===== UI更新 =====
+function updateUI() {
+  const activePlayers = gameState.players.filter(p => !p.isBankrupt);
+  if (activePlayers.length === 0) return;
+
+  // currentPlayerIndexが有効か確認
+  while (gameState.players[gameState.currentPlayerIndex] &&
+         gameState.players[gameState.currentPlayerIndex].isBankrupt) {
+    gameState.currentPlayerIndex = (gameState.currentPlayerIndex + 1) % gameState.players.length;
+  }
+
+  const cp = gameState.players[gameState.currentPlayerIndex];
+  if (!cp) return;
+
+  const turnInfo = document.getElementById("turnInfo");
+  const rollBtn = document.getElementById("rollBtn");
+  const buildBtn = document.getElementById("buildBtn");
+  const jailCardBtn = document.getElementById("jailCardBtn");
+
+  if (cp.isAI) {
+    turnInfo.textContent = cp.name + "의 차례";
+    rollBtn.disabled = true;
+    buildBtn.disabled = true;
+    jailCardBtn.style.display = "none";
+  } else {
+    turnInfo.textContent = "당신의 차례";
+    rollBtn.disabled = gameState.pendingAction !== null;
+    buildBtn.disabled = gameState.pendingAction !== null;
+    jailCardBtn.style.display = cp.jailCard && cp.inJail ? "block" : "none";
+  }
+
+  // アクティブカード更新
+  document.querySelectorAll(".player-card").forEach(el => el.classList.remove("active"));
+  const activeCard = document.getElementById("pcard-" + cp.id);
+  if (activeCard) activeCard.classList.add("active");
+}
+
+// ===== ログ =====
+const logEntries = [];
+function addLog(name, msg, color) {
+  logEntries.unshift({ name, msg, color });
+  if (logEntries.length > 50) logEntries.pop();
+  renderLog();
+}
+
+function renderLog() {
+  const list = document.getElementById("logList");
+  list.innerHTML = "";
+  logEntries.slice(0, 20).forEach(e => {
+    const div = document.createElement("div");
+    div.className = "log-entry";
+    div.innerHTML = `<span class="log-name" style="color:${e.color}">[${e.name}]</span> ${e.msg}`;
+    list.appendChild(div);
+  });
+}
+
+// ===== ダイスロール =====
+function rollDice() {
+  const d1 = rand(1, 6);
+  const d2 = rand(1, 6);
+  gameState.dice = [d1, d2];
+  gameState.lastDiceSum = d1 + d2;
+  gameState.isDoubles = d1 === d2;
+  renderDice(d1, d2);
+  return { d1, d2, sum: d1 + d2, doubles: d1 === d2 };
+}
+
+function renderDice(d1, d2) {
+  renderSingleDie("die1", d1);
+  renderSingleDie("die2", d2);
+}
+
+function renderSingleDie(id, val) {
+  const die = document.getElementById(id);
+  // ドット配置: 7つの位置 (a,b,c,d,e,f,g)
+  const patterns = {
+    1: [0,0,0,0,1,0,0],
+    2: [1,0,0,0,0,0,1],
+    3: [1,0,0,0,1,0,1],
+    4: [1,1,0,0,0,1,1],
+    5: [1,1,0,0,1,1,1],
+    6: [1,1,1,0,0,1,1], // 位置: a,b,c,d,e,f,g → top-left, top-right, mid-left, mid, mid-right, bot-left, bot-right
+  };
+  // シンプルな数字表示に変更 (小サイズ対応)
+  die.innerHTML = `<span style="grid-column:1/-1;grid-row:1/-1;display:flex;align-items:center;justify-content:center;font-size:1.4em;font-weight:900;color:#222;">${val}</span>`;
+  die.style.display = "flex";
+  die.style.alignItems = "center";
+  die.style.justifyContent = "center";
+}
+
+// ===== 移動 =====
+function movePlayer(player, steps, backwards) {
+  const old = player.position;
+  if (backwards) {
+    player.position = ((player.position - steps) + 40) % 40;
+  } else {
+    const newPos = player.position + steps;
+    // 出発を通過したか
+    if (!backwards && newPos >= 40 && !player.inJail) {
+      player.money += 200000;
+      addLog(player.name, `출발 통과! +${W(200000)}`, player.color);
+    }
+    player.position = newPos % 40;
+  }
+  renderBoard();
+  renderPlayers();
+}
+
+// ===== 教도所行き =====
+function sendToJail(player) {
+  player.position = 10;
+  player.inJail = true;
+  player.jailTurns = 0;
+  player.doubleCount = 0;
+  renderBoard();
+  renderPlayers();
+  addLog(player.name, "교도소에 갇혔습니다! 🔒", player.color);
+}
+
+// ===== マスイベント処理 =====
+async function handleSquareEvent(player) {
+  const sq = gameState.squares[player.position];
+  const squareData = SQUARE_DATA[player.position];
+
+  switch (sq.type) {
+    case "start":
+      addLog(player.name, "출발! +₩200,000", player.color);
+      player.money += 200000;
+      break;
+
+    case "property":
+    case "airport":
+    case "utility":
+      await handlePurchasable(player, sq);
+      break;
+
+    case "tax":
+      await handleTax(player, sq);
+      break;
+
+    case "chance":
+      await handleChance(player);
+      break;
+
+    case "go_to_jail":
+      sendToJail(player);
+      break;
+
+    case "jail_visit":
+      addLog(player.name, "교도소 방문 (통과)", player.color);
+      break;
+
+    case "free_parking":
+      addLog(player.name, "무료 주차 🅿", player.color);
+      break;
+  }
+
+  renderPlayers();
+}
+
+// ===== 購入可能マス処理 =====
+async function handlePurchasable(player, sq) {
+  if (sq.owner === null) {
+    // 未所有 → 購入オファー
+    if (player.isAI) {
+      aiDecideBuy(player, sq);
+    } else {
+      await showBuyModal(player, sq);
+    }
+  } else if (sq.owner !== player.id) {
+    // 他人所有 → 家賃支払い
+    const owner = gameState.players.find(p => p.id === sq.owner);
+    if (!owner || owner.isBankrupt) return;
+    const rent = calcRent(sq, player);
+    addLog(player.name, `${sq.name} 임대료 ${W(rent)} → ${owner.name}`, player.color);
+    await showRentModal(player, owner, sq.name, rent);
+    await transferMoney(player, owner, rent);
+  } else {
+    addLog(player.name, `자신의 소유지: ${sq.name}`, player.color);
+  }
+}
+
+function calcRent(sq, player) {
+  if (sq.type === "airport") {
+    const owner = sq.owner;
+    const cnt = gameState.squares.filter(s => s.type === "airport" && s.owner === owner).length;
+    let rent = (sq.airportRents || [25000,50000,100000,200000])[cnt - 1] || 25000;
+    if (gameState.doubleRentChance) rent *= 2;
+    return rent;
+  }
+  if (sq.type === "utility") {
+    return gameState.lastDiceSum * 4;
+  }
+  // property
+  if (sq.hotel) return sq.rent[5] || sq.rent[sq.rent.length - 1];
+  if (sq.houses > 0) return sq.rent[sq.houses] || sq.rent[sq.rent.length - 1];
+  // 独占チェック
+  const groupSquares = gameState.squares.filter(s => s.type === "property" && s.group === sq.group);
+  const monopoly = groupSquares.every(s => s.owner === sq.owner);
+  return monopoly ? sq.rent[1] : sq.rent[0];
+}
+
+async function handleTax(player, sq) {
+  addLog(player.name, `세금 ${W(sq.amount)} 납부`, player.color);
+  await showModal("💰 세금", `${sq.name}\n${W(sq.amount)} 납부`, [{ label:"확인", cls:"btn-primary" }]);
+  await transferMoney(player, null, sq.amount);
+}
+
+// ===== チャンス処理 =====
+async function handleChance(player) {
+  if (gameState.chanceCards.length === 0) {
+    gameState.chanceCards = shuffle([...gameState.chanceDiscardPile]);
+    gameState.chanceDiscardPile = [];
+  }
+  const card = gameState.chanceCards.pop();
+  gameState.chanceDiscardPile.push(card);
+
+  addLog(player.name, `찬스: ${card.text}`, player.color);
+  await showModal("❓ 찬스 카드", card.text, [{ label:"확인", cls:"btn-primary" }]);
+
+  await applyChanceCard(player, card);
+}
+
+async function applyChanceCard(player, card) {
+  switch (card.action) {
+    case "moveToStart":
+      player.money += 200000;
+      player.position = 0;
+      addLog(player.name, `출발로 이동 +${W(200000)}`, player.color);
+      break;
+
+    case "moveToNearestAirport": {
+      const airportIds = [5, 15, 25, 35];
+      let nearest = airportIds.reduce((best, aid) => {
+        const dist = (aid - player.position + 40) % 40;
+        const bestDist = (best - player.position + 40) % 40;
+        return dist < bestDist ? aid : best;
+      }, airportIds[0]);
+      if (nearest <= player.position) player.money += 200000; // 出発通過
+      player.position = nearest;
+      addLog(player.name, `가장 가까운 공항으로 이동 (sq${nearest})`, player.color);
+      await handlePurchasable(player, gameState.squares[nearest]);
+      break;
+    }
+
+    case "goToJail":
+      sendToJail(player);
+      break;
+
+    case "getJailCard":
+      player.jailCard = true;
+      addLog(player.name, "교도소 탈출권 획득! 🃏", player.color);
+      break;
+
+    case "bankReceive":
+      player.money += card.amount;
+      addLog(player.name, `은행에서 ${W(card.amount)} 수령`, player.color);
+      break;
+
+    case "bankPay":
+      await transferMoney(player, null, card.amount);
+      break;
+
+    case "repairFee": {
+      const props = gameState.squares.filter(s => s.owner === player.id);
+      const total = props.reduce((sum, s) => sum + s.houses * 40000 + (s.hotel ? 115000 : 0), 0);
+      addLog(player.name, `수리비 ${W(total)} 납부`, player.color);
+      await transferMoney(player, null, total);
+      break;
+    }
+
+    case "moveBack":
+      player.position = ((player.position - card.steps) + 40) % 40;
+      addLog(player.name, `${card.steps}칸 뒤로`, player.color);
+      await handleSquareEvent(player);
+      break;
+
+    case "moveToNextAirportDouble": {
+      const airportIds = [5, 15, 25, 35];
+      let nextAirport = airportIds.find(aid => aid > player.position) || airportIds[0];
+      if (nextAirport <= player.position) player.money += 200000;
+      player.position = nextAirport;
+      gameState.doubleRentChance = true;
+      addLog(player.name, `다음 공항으로 이동, 임대료 2배 (sq${nextAirport})`, player.color);
+      await handlePurchasable(player, gameState.squares[nextAirport]);
+      gameState.doubleRentChance = false;
+      break;
+    }
+
+    case "utilityTenX": {
+      const utilitySq = gameState.squares[12];
+      if (utilitySq.owner && utilitySq.owner !== player.id) {
+        const owner = gameState.players.find(p => p.id === utilitySq.owner);
+        const rent = gameState.lastDiceSum * 10;
+        if (owner && !owner.isBankrupt) {
+          addLog(player.name, `전력회사 임대료 ×10 = ${W(rent)}`, player.color);
+          await transferMoney(player, owner, rent);
+        }
+      }
+      break;
+    }
+
+    case "payEachPlayer": {
+      const others = gameState.players.filter(p => p.id !== player.id && !p.isBankrupt);
+      for (const other of others) {
+        await transferMoney(player, other, card.amount);
+      }
+      addLog(player.name, `각 플레이어에게 ${W(card.amount)} 지급`, player.color);
+      break;
+    }
+
+    case "receiveFromEachPlayer": {
+      const others = gameState.players.filter(p => p.id !== player.id && !p.isBankrupt);
+      for (const other of others) {
+        await transferMoney(other, player, card.amount);
+      }
+      addLog(player.name, `각 플레이어로부터 ${W(card.amount)} 수령`, player.color);
+      break;
+    }
+
+    case "moveForward":
+      player.position = (player.position + card.steps) % 40;
+      addLog(player.name, `${card.steps}칸 앞으로`, player.color);
+      await handleSquareEvent(player);
+      break;
+  }
+
+  renderBoard();
+  renderPlayers();
+}
+
+// ===== 資金移動 =====
+async function transferMoney(from, to, amount) {
+  if (!from) return;
+  from.money -= amount;
+  if (to) to.money += amount;
+  renderPlayers();
+
+  // 破産チェック
+  if (from.money < 0) {
+    await declareBankruptcy(from);
+  }
+}
+
+async function declareBankruptcy(player) {
+  player.isBankrupt = true;
+  player.money = 0;
+
+  // 所有地を銀行に戻す
+  gameState.squares.forEach(sq => {
+    if (sq.owner === player.id) {
+      sq.owner = null;
+      sq.houses = 0;
+      sq.hotel = false;
+    }
+  });
+
+  addLog(player.name, "파산! 💀 게임에서 제외됩니다.", player.color);
+  renderBoard();
+  renderPlayers();
+
+  await showModal("💀 파산", `${player.name} 파산!\n모든 자산이 은행으로 반환됩니다.`, [{ label:"확인", cls:"btn-danger" }]);
+
+  // 勝者チェック
+  const active = gameState.players.filter(p => !p.isBankrupt);
+  if (active.length === 1) {
+    await showGameOver(active[0]);
+  }
+}
+
+async function showGameOver(winner) {
+  gameState.gamePhase = "gameover";
+  await showModal(
+    "🏆 게임 종료!",
+    `<div class="gameover-winner">${winner.emoji}</div><span class="modal-highlight">${winner.name} 승리!</span>최종 자산: ${W(winner.money)}`,
+    [{ label:"다시 하기", cls:"btn-primary", cb: () => location.reload() }]
+  );
+}
+
+// ===== モーダル =====
+function showModal(title, body, buttons) {
+  return new Promise(resolve => {
+    document.getElementById("modalTitle").textContent = title;
+    document.getElementById("modalBody").innerHTML = body.replace(/\n/g, "<br>");
+    const btns = document.getElementById("modalBtns");
+    btns.innerHTML = "";
+
+    buttons.forEach(btn => {
+      const el = document.createElement("button");
+      el.className = btn.cls || "btn-primary";
+      el.textContent = btn.label;
+      el.addEventListener("click", () => {
+        closeModal();
+        if (btn.cb) btn.cb();
+        resolve(btn.label);
+      }, { once: true });
+      btns.appendChild(el);
+    });
+
+    document.getElementById("modalBackdrop").classList.add("open");
+  });
+}
+
+function closeModal() {
+  document.getElementById("modalBackdrop").classList.remove("open");
+  gameState.pendingAction = null;
+}
+
+async function showBuyModal(player, sq) {
+  const result = await showModal(
+    "🏠 구매",
+    `<strong>${sq.name}</strong>\n가격: <span class="modal-highlight">${W(sq.price)}</span>`,
+    [
+      { label:"구매하기", cls:"btn-primary" },
+      { label:"패스", cls:"btn-secondary" }
+    ]
+  );
+  if (result === "구매하기") {
+    buyProperty(player, sq);
+  }
+}
+
+function buyProperty(player, sq) {
+  if (player.money < sq.price) {
+    addLog(player.name, `자금 부족으로 구매 불가 (${W(sq.price)})`, player.color);
+    return;
+  }
+  player.money -= sq.price;
+  sq.owner = player.id;
+  addLog(player.name, `${sq.name} 구매! ${W(sq.price)}`, player.color);
+  renderBoard();
+  renderPlayers();
+}
+
+async function showRentModal(payer, receiver, sqName, amount) {
+  await showModal(
+    "💸 임대료",
+    `${payer.name} → ${receiver.name}\n<strong>${sqName}</strong>\n임대료: <span class="modal-highlight">${W(amount)}</span>`,
+    [{ label:"확인", cls:"btn-primary" }]
+  );
+}
+
+// ===== 建設 =====
+document.getElementById("buildBtn").addEventListener("click", () => {
+  const cp = gameState.players[gameState.currentPlayerIndex];
+  if (!cp || cp.isAI) return;
+  showBuildModal(cp);
+});
+
+async function showBuildModal(player) {
+  const buildable = getBuildableSquares(player);
+  if (buildable.length === 0) {
+    await showModal("🏠 건설", "건설 가능한 부지가 없습니다.\n독점 소유 후 건설 가능합니다.", [{ label:"닫기", cls:"btn-secondary" }]);
+    return;
+  }
+
+  return new Promise(resolve => {
+    document.getElementById("modalTitle").textContent = "🏠 건설하기";
+    const body = document.getElementById("modalBody");
+    body.innerHTML = "";
+
+    const list = document.createElement("div");
+    list.className = "build-list";
+
+    buildable.forEach(sq => {
+      const item = document.createElement("div");
+      item.className = "build-item";
+
+      const band = document.createElement("div");
+      band.className = "bi-band";
+      band.style.background = sq.color;
+
+      const info = document.createElement("div");
+      info.className = "bi-info";
+      const status = sq.hotel ? "호텔" : (sq.houses > 0 ? `집 ${sq.houses}채` : "나대지");
+      info.innerHTML = `<div class="bi-name">${sq.name}</div><div class="bi-status">${status} | 건설비 ${W(sq.houseCost)}</div>`;
+
+      const btn = document.createElement("button");
+      btn.className = "bi-btn";
+      btn.textContent = sq.hotel ? "완료" : (sq.houses === 4 ? "+호텔" : "+집");
+      if (sq.hotel) btn.disabled = true;
+      btn.addEventListener("click", () => {
+        if (player.money < sq.houseCost) {
+          addLog(player.name, "자금 부족!", player.color);
+          return;
+        }
+        buildOnSquare(player, sq);
+        // 再レンダリング
+        const newBuildable = getBuildableSquares(player);
+        const foundSq = newBuildable.find(s => s.id === sq.id);
+        if (foundSq) {
+          const newStatus = foundSq.hotel ? "호텔" : `집 ${foundSq.houses}채`;
+          info.querySelector(".bi-status").textContent = `${newStatus} | 건설비 ${W(foundSq.houseCost)}`;
+          btn.textContent = foundSq.hotel ? "완료" : (foundSq.houses === 4 ? "+호텔" : "+집");
+          if (foundSq.hotel) btn.disabled = true;
+        }
+      }, { once: false });
+
+      item.appendChild(band);
+      item.appendChild(info);
+      item.appendChild(btn);
+      list.appendChild(item);
+    });
+
+    body.appendChild(list);
+
+    const btns = document.getElementById("modalBtns");
+    btns.innerHTML = "";
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "btn-secondary";
+    closeBtn.textContent = "닫기";
+    closeBtn.addEventListener("click", () => {
+      closeModal();
+      resolve();
+    }, { once: true });
+    btns.appendChild(closeBtn);
+
+    document.getElementById("modalBackdrop").classList.add("open");
+  });
+}
+
+function getBuildableSquares(player) {
+  const result = [];
+  const groups = {};
+  gameState.squares.forEach(sq => {
+    if (sq.type === "property" && sq.owner === player.id) {
+      if (!groups[sq.group]) groups[sq.group] = [];
+      groups[sq.group].push(sq);
+    }
+  });
+
+  Object.values(groups).forEach(groupSqs => {
+    // グループ内全てを所有しているか確認
+    const sqData = SQUARE_DATA.find(s => s.group === groupSqs[0].group && s.type === "property");
+    const allGroupSqs = SQUARE_DATA.filter(s => s.group === groupSqs[0].group && s.type === "property");
+    const monopoly = allGroupSqs.every(s => gameState.squares[s.id].owner === player.id);
+    if (!monopoly) return;
+
+    groupSqs.forEach(sq => {
+      if (!sq.hotel) result.push(sq);
+    });
+  });
+
+  return result;
+}
+
+function buildOnSquare(player, sq) {
+  if (player.money < sq.houseCost) return;
+  player.money -= sq.houseCost;
+
+  if (sq.houses === 4) {
+    sq.houses = 0;
+    sq.hotel = true;
+    addLog(player.name, `${sq.name} 호텔 건설! 🏨`, player.color);
+  } else {
+    sq.houses += 1;
+    addLog(player.name, `${sq.name} 집 ${sq.houses}채 건설 🏠`, player.color);
+  }
+
+  renderBoard();
+  renderPlayers();
+}
+
+// ===== 탈출권 사용 =====
+document.getElementById("jailCardBtn").addEventListener("click", async () => {
+  const cp = gameState.players[gameState.currentPlayerIndex];
+  if (!cp || !cp.jailCard || !cp.inJail) return;
+  cp.jailCard = false;
+  cp.inJail = false;
+  cp.jailTurns = 0;
+  addLog(cp.name, "탈출권 사용! 교도소 탈출! 🃏", cp.color);
+  renderPlayers();
+  updateUI();
+  // 通常ターン継続
+  await executePlayerTurn(cp);
+});
+
+// ===== メインターンロジック =====
+document.getElementById("rollBtn").addEventListener("click", async () => {
+  const cp = gameState.players[gameState.currentPlayerIndex];
+  if (!cp || cp.isAI || gameState.pendingAction) return;
+
+  document.getElementById("rollBtn").disabled = true;
+  document.getElementById("buildBtn").disabled = true;
+  document.getElementById("jailCardBtn").style.display = "none";
+
+  await executePlayerTurn(cp);
+});
+
+async function executePlayerTurn(player) {
+  gameState.pendingAction = "rolling";
+
+  if (player.inJail) {
+    await handleJailTurn(player);
+  } else {
+    const { d1, d2, sum, doubles } = rollDice();
+    addLog(player.name, `🎲 ${d1} + ${d2} = ${sum}${doubles ? " (더블!)" : ""}`, player.color);
+
+    if (doubles) {
+      player.doubleCount++;
+      if (player.doubleCount >= 3) {
+        addLog(player.name, "3연속 더블! 교도소 직행 🚔", player.color);
+        sendToJail(player);
+        await endTurn();
+        return;
+      }
+    } else {
+      player.doubleCount = 0;
+    }
+
+    movePlayer(player, sum);
+    await handleSquareEvent(player);
+
+    if (doubles && !player.inJail && gameState.gamePhase === "playing") {
+      addLog(player.name, "더블! 한 번 더 굴립니다.", player.color);
+      gameState.pendingAction = null;
+      if (player.isAI) {
+        await sleep(rand(800, 1200));
+        await executePlayerTurn(player);
+      } else {
+        updateUI();
+        document.getElementById("rollBtn").disabled = false;
+      }
+      return;
+    }
+  }
+
+  await endTurn();
+}
+
+async function handleJailTurn(player) {
+  const { d1, d2, sum, doubles } = rollDice();
+  addLog(player.name, `🔒 교도소 주사위: ${d1} + ${d2}${doubles ? " (탈출!)" : ""}`, player.color);
+
+  if (doubles) {
+    player.inJail = false;
+    player.jailTurns = 0;
+    player.doubleCount = 0;
+    addLog(player.name, "더블로 교도소 탈출! 🎉", player.color);
+    movePlayer(player, sum);
+    await handleSquareEvent(player);
+  } else {
+    player.jailTurns++;
+    if (player.jailTurns >= 3) {
+      // 강제 보석금
+      addLog(player.name, `보석금 ${W(50000)} 납부 후 출소`, player.color);
+      await transferMoney(player, null, 50000);
+      player.inJail = false;
+      player.jailTurns = 0;
+      movePlayer(player, sum);
+      await handleSquareEvent(player);
+    } else {
+      addLog(player.name, `교도소 ${player.jailTurns}번째 턴 (최대 3턴)`, player.color);
+    }
+  }
+}
+
+async function endTurn() {
+  gameState.pendingAction = null;
+
+  if (gameState.gamePhase !== "playing") return;
+
+  // 次のプレイヤーへ
+  let next = (gameState.currentPlayerIndex + 1) % gameState.players.length;
+  let loops = 0;
+  while (gameState.players[next].isBankrupt) {
+    next = (next + 1) % gameState.players.length;
+    loops++;
+    if (loops > gameState.players.length) break;
+  }
+  gameState.currentPlayerIndex = next;
+
+  // 생존자 확인
+  const active = gameState.players.filter(p => !p.isBankrupt);
+  if (active.length === 1) {
+    await showGameOver(active[0]);
+    return;
+  }
+
+  renderPlayers();
+  updateUI();
+
+  const cp = gameState.players[gameState.currentPlayerIndex];
+  if (cp && cp.isAI && gameState.gamePhase === "playing") {
+    await sleep(rand(600, 1000));
+    await runAiTurn(cp);
+  }
+}
+
+// ===== AI共有ロジック =====
+async function runAiTurn(player) {
+  if (player.isBankrupt || gameState.gamePhase !== "playing") return;
+
+  addLog(player.name, "AI 턴 시작...", player.color);
+
+  // 建設判断
+  await aiConsiderBuilding(player);
+
+  await sleep(rand(800, 1200));
+
+  // 釈放判断
+  if (player.inJail) {
+    if (player.jailCard) {
+      player.jailCard = false;
+      player.inJail = false;
+      player.jailTurns = 0;
+      addLog(player.name, "탈출권 사용! 🃏", player.color);
+    } else if (player.money > 500000) {
+      player.money -= 50000;
+      player.inJail = false;
+      player.jailTurns = 0;
+      addLog(player.name, `보석금 ${W(50000)} 납부`, player.color);
+    }
+  }
+
+  await executePlayerTurn(player);
+}
+
+async function aiConsiderBuilding(player) {
+  const groups = {};
+  gameState.squares.forEach(sq => {
+    if (sq.type === "property" && sq.owner === player.id) {
+      if (!groups[sq.group]) groups[sq.group] = [];
+      groups[sq.group].push(sq);
+    }
+  });
+
+  for (const [group, sqs] of Object.entries(groups)) {
+    const allGroupSqs = SQUARE_DATA.filter(s => s.group === group && s.type === "property");
+    const monopoly = allGroupSqs.every(s => gameState.squares[s.id].owner === player.id);
+    if (!monopoly) continue;
+
+    // 最小ハウス数のマスに建設
+    const buildable = sqs.filter(s => !s.hotel);
+    if (buildable.length === 0) continue;
+
+    const cheapest = buildable.reduce((a, b) => a.houses < b.houses ? a : b);
+    if (player.money > cheapest.houseCost * 2) {
+      buildOnSquare(player, cheapest);
+      await sleep(300);
+    }
+  }
+}
+
+function aiDecideBuy(player, sq) {
+  const groupSqs = SQUARE_DATA.filter(s => s.group === sq.group && s.type === "property");
+  const ownsGroupMember = groupSqs.some(s => gameState.squares[s.id].owner === player.id);
+
+  if (player.money > sq.price * 2) {
+    buyProperty(player, sq);
+  } else if (player.money > sq.price && ownsGroupMember) {
+    buyProperty(player, sq);
+  } else {
+    addLog(player.name, `${sq.name} 구매 포기`, player.color);
+  }
+}
+
+// ===== ユーティリティ =====
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ===== ウィンドウリサイズ対応 =====
+let resizeTimer;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (gameState.gamePhase === "playing") {
+      buildBoard();
+      renderBoard();
+    }
+  }, 200);
+});
+
+// ===== 初期状態 =====
+// タイトル画面が既に表示されているので何もしない
+</script>
+</body>
+</html>
