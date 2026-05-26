@@ -1,0 +1,112 @@
+/* ===== リセット & ベース変数 ===== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --board-size: min(98vw, 98svh);
+  --corner-size: calc(var(--board-size) / 11);
+  --side-size: calc((var(--board-size) - 2 * var(--corner-size)) / 9);
+  --bg: #0f172a;
+  --panel-bg: #1e293b;
+  --card-bg: #273549;
+  --border: #334155;
+  --text: #f1f5f9;
+  --text-muted: #94a3b8;
+  --accent: #f6d365;
+  --green: #4ade80;
+  --red: #f87171;
+  --blue: #60a5fa;
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --board-size: min(calc(100vh - 40px), calc(100vw - 340px));
+  }
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', -apple-system, Arial, sans-serif;
+  overflow-x: hidden;
+}
+
+/* ===== ボタン共通 ===== */
+button {
+  cursor: pointer;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  min-height: 48px;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: all 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* ===== ボタンバリアント ===== */
+.btn-primary {
+  background: linear-gradient(135deg, #f6d365, #fda085);
+  color: #1a1a1a;
+  font-weight: 700;
+}
+
+.btn-secondary {
+  background: var(--card-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-danger {
+  background: #ef4444;
+  color: white;
+  font-weight: 700;
+}
+
+.btn-green {
+  background: #22c55e;
+  color: #0f2c0f;
+  font-weight: 700;
+}
+
+.btn-blue {
+  background: var(--blue);
+  color: #0c1a2e;
+  font-weight: 700;
+}
+
+/* ===== スクロールバー ===== */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+/* ===== アニメーション共通 ===== */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(40px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+@keyframes tokenBounce {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-5px); }
+}

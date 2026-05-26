@@ -1,0 +1,385 @@
+/* ===== モーダルバックドロップ ===== */
+#modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 500;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+@media (min-width: 768px) {
+  #modalBackdrop { align-items: center; }
+}
+
+#modalBackdrop.open { display: flex; }
+
+/* ===== モーダルシート ===== */
+.modal-sheet {
+  background: var(--panel-bg);
+  border-radius: 20px 20px 0 0;
+  padding: 20px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
+  animation: slideUp 0.25s ease;
+}
+
+@media (min-width: 768px) {
+  .modal-sheet {
+    border-radius: 16px;
+    max-width: 420px;
+    max-height: 80vh;
+  }
+}
+
+.modal-sheet h2 {
+  font-size: 1.15rem;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.modal-body {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  text-align: center;
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+.modal-highlight {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--accent);
+  display: block;
+  margin: 6px 0;
+}
+
+.modal-btns {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.modal-btns button {
+  flex: 1;
+  min-width: 120px;
+  height: 48px;
+  min-height: 48px;
+}
+
+/* ===== 建物管理リスト ===== */
+.build-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+  max-height: 45vh;
+  overflow-y: auto;
+}
+
+.build-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card-bg);
+  border-radius: 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+}
+
+.build-item.mortgaged-item {
+  opacity: 0.6;
+  border-color: #666;
+}
+
+.bi-band {
+  width: 12px;
+  height: 44px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.bi-info {
+  flex: 1;
+  font-size: 0.83rem;
+}
+
+.bi-name { font-weight: 700; font-size: 0.88rem; }
+
+.bi-status {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.bi-btn {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 0.8rem;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.bi-btn-build {
+  background: #22c55e;
+  color: #0f2c0f;
+  font-weight: 700;
+  border: none;
+}
+
+.bi-btn-build:disabled {
+  background: var(--border);
+  color: var(--text-muted);
+}
+
+.bi-btn-mortgage {
+  background: var(--panel-bg);
+  color: var(--red);
+  border: 1px solid var(--red);
+}
+
+.bi-btn-unmortgage {
+  background: var(--panel-bg);
+  color: var(--green);
+  border: 1px solid var(--green);
+}
+
+/* ===== 경매 모달 ===== */
+.auction-info {
+  background: var(--card-bg);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.auction-current-bid {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.auction-input-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  align-items: center;
+}
+
+.auction-input {
+  flex: 1;
+  height: 44px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 1rem;
+  padding: 0 12px;
+  font-family: inherit;
+}
+
+/* ===== 거래 모달 ===== */
+.trade-section {
+  margin-bottom: 14px;
+}
+
+.trade-section-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 6px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.trade-opponent-select {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.trade-opponent-btn {
+  flex: 1;
+  height: 38px;
+  min-height: 38px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.85rem;
+  border-radius: 8px;
+}
+
+.trade-opponent-btn.active {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.trade-cash-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.trade-cash-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  min-width: 60px;
+}
+
+.trade-cash-input {
+  flex: 1;
+  height: 40px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 0.95rem;
+  padding: 0 10px;
+  font-family: inherit;
+}
+
+.trade-property-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.trade-property-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--card-bg);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.83rem;
+}
+
+.trade-property-item input[type=checkbox] {
+  accent-color: var(--blue);
+}
+
+.trade-prop-band {
+  width: 8px;
+  height: 20px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ===== 대출 모달 ===== */
+.loan-info {
+  background: var(--card-bg);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 14px;
+  text-align: center;
+}
+
+/* ===== 인수 모달 ===== */
+.acquire-cost {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #ff9800;
+  display: block;
+  margin: 6px 0;
+}
+
+/* ===== 모두의마블 건설 선택지 모달 ===== */
+.bo-current {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.build-option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.build-option-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 16px;
+  background: var(--card-bg);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 0.95rem;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.build-option-btn:not(:disabled):hover {
+  border-color: var(--accent);
+  background: rgba(246,211,101,0.08);
+}
+
+.build-option-btn:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+.build-option-btn.bo-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.bo-icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.bo-label {
+  flex: 1;
+  font-weight: 700;
+}
+
+.bo-cost {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+/* ===== 건설 확인 화면 ===== */
+.bo-confirm-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0 4px;
+}
+
+.bo-confirm-icon {
+  font-size: 2.8rem;
+  line-height: 1;
+}
+
+.bo-confirm-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.bo-confirm-cost {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.bo-confirm-balance {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}

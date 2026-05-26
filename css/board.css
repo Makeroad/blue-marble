@@ -1,0 +1,288 @@
+/* ===== ゲーム画面レイアウト ===== */
+#gameScreen {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+  gap: 10px;
+  min-height: 100vh;
+  padding-bottom: 20px;
+}
+
+@media (min-width: 1024px) {
+  #gameScreen {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 20px;
+    gap: 20px;
+  }
+}
+
+/* ===== ボードラッパー ===== */
+#boardWrapper {
+  position: relative;
+  width: var(--board-size);
+  height: var(--board-size);
+  flex-shrink: 0;
+}
+
+#board {
+  position: relative;
+  width: var(--board-size);
+  height: var(--board-size);
+  background: #e8f5e9;
+  border: 2px solid #333;
+  overflow: hidden;
+}
+
+/* ===== マス目 ===== */
+.sq {
+  position: absolute;
+  border: 1px solid #666;
+  background: #f0f8e8;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  cursor: default;
+  user-select: none;
+}
+
+.sq .sq-name {
+  font-weight: 700;
+  color: #1a1a1a;
+  line-height: 1.2;
+  padding: 1px 2px;
+  font-size: calc(var(--corner-size) * 0.13);
+  word-break: keep-all;
+}
+
+.sq .sq-price {
+  color: #555;
+  font-size: calc(var(--corner-size) * 0.1);
+  margin-top: 1px;
+}
+
+/* ===== カラーバンド ===== */
+.sq .color-band {
+  position: absolute;
+  background: currentColor;
+}
+
+/* 底辺列 (0-10): バンドは上側 */
+.sq.bottom .color-band {
+  top: 0; left: 0; right: 0;
+  height: 8px;
+}
+
+/* 左辺列 (10-20): バンドは右側 */
+.sq.left-col .color-band {
+  top: 0; right: 0; bottom: 0;
+  width: 8px;
+}
+
+/* 上辺列 (20-30): バンドは下側 */
+.sq.top .color-band {
+  bottom: 0; left: 0; right: 0;
+  height: 8px;
+}
+
+/* 右辺列 (30-39): バンドは左側 */
+.sq.right-col .color-band {
+  top: 0; left: 0; bottom: 0;
+  width: 8px;
+}
+
+/* ===== コーナーマス ===== */
+.sq.corner {
+  background: #dff0d8;
+}
+
+.sq.corner .sq-name {
+  font-size: calc(var(--corner-size) * 0.15);
+  font-weight: 700;
+}
+
+/* ===== 特殊マス色 ===== */
+.sq.chance        { background: #fff9c4; }
+.sq.tax           { background: #fce4ec; }
+.sq.jail-visit    { background: #e3f2fd; }
+.sq.go-to-jail    { background: #ffccbc; }
+.sq.free-parking  { background: #e8f5e9; }
+.sq.airport       { background: #e3f2fd; }
+.sq.utility       { background: #f3e5f5; }
+.sq.start         { background: #c8e6c9; }
+
+/* 저당된 땅 표시 */
+.sq.mortgaged {
+  background: #f0f0f0 !important;
+  opacity: 0.7;
+}
+
+/* ===== 所有者バッジ ===== */
+.sq .owner-badge {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid rgba(0,0,0,0.3);
+  display: none;
+}
+
+/* ===== 建物表示 ===== */
+.sq .buildings {
+  display: flex;
+  gap: 1px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+.sq .bld-house {
+  width: 5px;
+  height: 5px;
+  background: #4caf50;
+  border-radius: 1px;
+}
+
+.sq .bld-hotel {
+  width: 10px;
+  height: 6px;
+  background: #f44336;
+  border-radius: 1px;
+}
+
+.sq .bld-flag {
+  width: 5px;
+  height: 7px;
+  background: #2196F3;
+  clip-path: polygon(0 0, 100% 30%, 0 60%, 0 100%);
+}
+
+.sq .bld-villa {
+  width: 6px;
+  height: 6px;
+  background: #9c27b0;
+  border-radius: 50% 50% 0 0;
+}
+
+.sq .bld-building {
+  width: 7px;
+  height: 8px;
+  background: #ff9800;
+  border-radius: 1px;
+}
+
+.sq .bld-landmark {
+  width: 10px;
+  height: 10px;
+  background: gold;
+  clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+}
+
+/* ===== トークン ===== */
+.sq .tokens {
+  position: absolute;
+  bottom: 2px;
+  left: 2px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  max-width: 80%;
+}
+
+.token {
+  width: calc(var(--corner-size) * 0.28);
+  height: calc(var(--corner-size) * 0.28);
+  min-width: 14px;
+  min-height: 14px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(var(--corner-size) * 0.16);
+  font-weight: 700;
+  border: 1.5px solid rgba(255,255,255,0.8);
+  color: #fff;
+  text-shadow: 0 0 3px rgba(0,0,0,0.5);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  flex-shrink: 0;
+  transition: transform 0.1s ease;
+}
+
+.token.moving {
+  animation: tokenBounce 0.15s ease infinite;
+}
+
+/* ===== ボード中央エリア ===== */
+#boardCenter {
+  position: absolute;
+  top: var(--corner-size);
+  left: var(--corner-size);
+  width: calc(var(--board-size) - 2 * var(--corner-size));
+  height: calc(var(--board-size) - 2 * var(--corner-size));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+
+#centerTitle {
+  font-size: calc(var(--board-size) * 0.055);
+  font-weight: 900;
+  background: linear-gradient(135deg, #1565c0, #0d47a1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 2px;
+  text-align: center;
+}
+
+#centerMode {
+  font-size: calc(var(--board-size) * 0.028);
+  color: #777;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* ===== ダイス表示 (数字) ===== */
+#diceArea {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  pointer-events: none;
+}
+
+.dice-num {
+  width: calc(var(--board-size) * 0.075);
+  height: calc(var(--board-size) * 0.075);
+  min-width: 40px;
+  min-height: 40px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 2px 2px 8px rgba(0,0,0,0.25);
+  font-size: calc(var(--board-size) * 0.045);
+  min-font-size: 22px;
+  font-weight: 900;
+  color: #222;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #ddd;
+}
+
+.dice-num.rolling {
+  animation: diceShake 0.08s ease infinite alternate;
+}
+
+@keyframes diceShake {
+  from { transform: rotate(-5deg) scale(1.05); }
+  to   { transform: rotate(5deg) scale(0.95); }
+}
