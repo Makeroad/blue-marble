@@ -1,6 +1,42 @@
 // ===== モーダル / ポップアップ管理 =====
 // showModal はすべて Promise を返す
 
+// ===== イベントモーダル: すべての金銭取引に使用 =====
+// アイコン + タイトル + メッセージ + 確認ボタン構造 (bottom sheet スタイル)
+function showEventModal({ icon, title, message, onConfirm }) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'event-modal-overlay';
+
+    const panel = document.createElement('div');
+    panel.className = 'event-modal-panel';
+
+    // **text** → <strong>text</strong> に変換、\n → <br>
+    const formattedMsg = (message || '')
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n/g, '<br>');
+
+    panel.innerHTML = `
+      <div class="event-modal-icon">${icon || '📌'}</div>
+      <div class="event-modal-title">${title || ''}</div>
+      <div class="event-modal-message">${formattedMsg}</div>
+    `;
+
+    const btn = document.createElement('button');
+    btn.className = 'event-modal-btn';
+    btn.textContent = '확인';
+    btn.addEventListener('click', () => {
+      overlay.remove();
+      if (onConfirm) onConfirm();
+      resolve();
+    }, { once: true });
+
+    panel.appendChild(btn);
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+  });
+}
+
 // ===== 汎用モーダル =====
 function showModal(title, bodyHtml, buttons) {
   return new Promise(resolve => {
@@ -34,29 +70,176 @@ function closeModal() {
   document.getElementById('modalBackdrop').classList.remove('open');
 }
 
-// ===== 土地購入モーダル =====
+// ===== 土地購入モーダル (モード別分岐) =====
+// モノポリー & ブルーマーブル1周目: シンプル購入
+// ブルーマーブル2周目以降 & モの자마블: 建設選択肢付き
 async function showBuyModal(player, cell) {
   const sq = boardData[cell.id];
-  const canAfford = player.money >= cell.price;
-  const result = await showModal(
-    '🏠 부지 구매',
-    `<strong>${sq.name}</strong><br>가격: <span class="modal-highlight">${W(cell.price)}</span>
-     ${!canAfford ? '<br><span style="color:var(--red)">자금 부족!</span>' : ''}`,
-    [
-      { label:'구매', cls:'btn-primary', value:'buy', disabled: !canAfford },
-      { label:'패스', cls:'btn-secondary', value:'pass' },
-    ]
-  );
-  return result === 'buy';
+
+  // モノポリー: シンプル購入/パス
+  if (state.mode === 'monopoly') {
+    const canAfford = player.money >= cell.price;
+    const result = await showModal(
+      '🏠 부지 구매',
+      `<strong>${sq.name}</strong><br>가격: <span class="modal-highlight">${W(cell.price)}</span>
+       ${!canAfford ? '<br><span style="color:var(--red)">자금 부족!</span>' : ''}`,
+      [
+        { label:'구매', cls:'btn-primary', value:'buy', disabled: !canAfford },
+        { label:'패스', cls:'btn-secondary', value:'pass' },
+      ]
+    );
+    return result === 'buy';
+  }
+
+  // ブルーマーブル1周目: 땅만 구매/패스
+  if (state.mode === 'bluemarble' && player.lapsCompleted === 0) {
+    const canAfford = player.money >= cell.price;
+    const result = await showModal(
+      '🏠 부지 구매',
+      `<strong>${sq.name}</strong><br>가격: <span class="modal-highlight">${W(cell.price)}</span>
+       <br><span style="font-size:0.8rem;color:var(--text-muted)">첫 바퀴에는 땅만 구매 가능</span>
+       ${!canAfford ? '<br><span style="color:var(--red)">자금 부족!</span>' : ''}`,
+      [
+        { label:'땅만 구매', cls:'btn-primary', value:'buy', disabled: !canAfford },
+        { label:'패스', cls:'btn-secondary', value:'pass' },
+      ]
+    );
+    return result === 'buy'; // boolean true = 땅만 구매
+  }
+
+  // ブルーマーブル2周目以降 & モの자マーブル: 建設オプション付き
+  return showBuyWithBuildModal(player, cell);
 }
 
-// ===== 임대료 알림 모달 =====
+// ===== 購入+建設オプションモーダル (ブルーマーブル2周目以降 & モの자マーブル) =====
+// 返り値: false (パス) | true (땅만) | { bought:true, buildLevel:N } (건설 포함)
+function showBuyWithBuildModal(player, cell) {
+  const sq  = boardData[cell.id];
+  const cfg = state.config;
+  // モの자マーブルはlvl1-3まで、ブルーマーブルはmaxBuildLevel(3)まで
+  const maxLvl = state.mode === 'marblemoa' ? 3 : cfg.maxBuildLevel;
+
+  return new Promise(resolve => {
+    const titleEl = document.getElementById('modalTitle');
+    const bodyEl  = document.getElementById('modalBody');
+    const btnsEl  = document.getElementById('modalBtns');
+
+    titleEl.textContent = `🏙️ ${sq.name} 구매`;
+
+    let showBuildOpts = false;
+    let selectedBuildLevel = 0;
+
+    // コスト計算
+    const getTotal = () => sq.price + selectedBuildLevel * sq.buildCost;
+
+    // 各レベルの購入可否
+    const canAffordLevel = (lvl) => player.money >= sq.price + lvl * sq.buildCost;
+
+    // メインレンダリング
+    const render = () => {
+      const total    = getTotal();
+      const afterBal = player.money - total;
+
+      let buildHtml = '';
+      if (showBuildOpts) {
+        let rows = `<div class="bbm-build-section">
+          <div class="bbm-build-label">건물 선택</div>`;
+        for (let lvl = 1; lvl <= maxLvl; lvl++) {
+          const affordable = canAffordLevel(lvl);
+          const checked    = selectedBuildLevel >= lvl;
+          rows += `<label class="bbm-build-option${!affordable ? ' bbm-opt-disabled' : ''}">
+            <input type="checkbox" class="bbm-cb" data-level="${lvl}"
+              ${checked ? 'checked' : ''} ${!affordable ? 'disabled' : ''}>
+            <span class="bbm-build-icon">${cfg.buildIcons[lvl] || ''}</span>
+            <span class="bbm-build-name">${cfg.buildLabels[lvl] || ''}</span>
+            <span class="bbm-build-cost">+${W(sq.buildCost)}</span>
+          </label>`;
+        }
+        rows += '</div>';
+        buildHtml = rows;
+      }
+
+      bodyEl.innerHTML = `
+        <div class="bbm-header">
+          <div class="bbm-title">${sq.name}</div>
+          <div class="bbm-price">땅값: ${W(sq.price)}</div>
+        </div>
+        ${showBuildOpts ? buildHtml : ''}
+        <div class="bbm-summary">
+          <div class="bbm-total">합계: <strong>${W(total)}</strong></div>
+          <div class="bbm-balance">잔액: ${W(player.money)} → <strong style="color:${afterBal < 0 ? 'var(--red)' : 'var(--green)'}">${W(afterBal)}</strong></div>
+        </div>
+      `;
+
+      if (!showBuildOpts) {
+        // 건물도 같이 짓기 토글 버튼
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'bbm-toggle-btn';
+        toggleBtn.textContent = '🏗️ 건물도 같이 짓기';
+        toggleBtn.addEventListener('click', () => {
+          showBuildOpts = true;
+          selectedBuildLevel = 0;
+          render();
+        }, { once: true });
+        bodyEl.insertBefore(toggleBtn, bodyEl.querySelector('.bbm-summary'));
+      } else {
+        // チェックボックスイベント再接続
+        document.querySelectorAll('.bbm-cb').forEach(cb => {
+          cb.addEventListener('change', () => {
+            const lvl = parseInt(cb.dataset.level);
+            if (cb.checked) {
+              selectedBuildLevel = lvl; // このレベルまで自動選択
+            } else {
+              selectedBuildLevel = lvl - 1; // 1段階下まで
+            }
+            render();
+          }, { once: true });
+        });
+      }
+
+      renderBtns();
+    };
+
+    const renderBtns = () => {
+      btnsEl.innerHTML = '';
+      const total      = getTotal();
+      const canAfford  = player.money >= sq.price;
+
+      const buyBtn = document.createElement('button');
+      buyBtn.className   = 'btn-primary';
+      buyBtn.textContent = selectedBuildLevel > 0 ? '구매 + 건설하기' : '구매하기';
+      buyBtn.disabled    = !canAfford || total > player.money;
+      buyBtn.style.cssText = 'flex:1;height:48px';
+      buyBtn.addEventListener('click', () => {
+        closeModal();
+        resolve({ bought: true, buildLevel: selectedBuildLevel });
+      }, { once: true });
+
+      const passBtn = document.createElement('button');
+      passBtn.className   = 'btn-secondary';
+      passBtn.textContent = '패스';
+      passBtn.style.cssText = 'flex:1;height:48px';
+      passBtn.addEventListener('click', () => {
+        closeModal();
+        resolve(false);
+      }, { once: true });
+
+      btnsEl.appendChild(buyBtn);
+      btnsEl.appendChild(passBtn);
+    };
+
+    render();
+    document.getElementById('modalBackdrop').classList.add('open');
+  });
+}
+
+// ===== 임대료 알림 모달 (イベントモーダルスタイル) =====
 async function showRentModal(payer, owner, cellName, amount) {
-  await showModal(
-    '💸 임대료',
-    `<strong>${cellName}</strong><br>${payer.name} → ${owner.name}<br>임대료: <span class="modal-highlight">${W(amount)}</span>`,
-    [{ label:'확인', cls:'btn-primary' }]
-  );
+  await showEventModal({
+    icon: '💸',
+    title: '통행료 납부',
+    message: `**${owner.name}**의 **${cellName}**를 지나쳤습니다.\n${W(amount)}을 **${owner.name}**에게 납부합니다.`,
+  });
 }
 
 // ===== 찬스 카드 모달 =====
@@ -68,14 +251,13 @@ async function showChanceModal(player, card) {
   );
 }
 
-// ===== 파산 모달 =====
+// ===== 파산 모달 (イベントモーダルスタイル) =====
 async function showBankruptModal(player) {
-  await showModal(
-    '💀 파산',
-    `<div class="gameover-winner">${player.emoji}</div>
-     <strong>${player.name}</strong> 파산!<br>모든 자산이 처리됩니다.`,
-    [{ label:'확인', cls:'btn-danger' }]
-  );
+  await showEventModal({
+    icon: '💀',
+    title: '파산',
+    message: `**${player.name}**이(가) 파산했습니다.\n모든 자산이 양도됩니다.`,
+  });
 }
 
 // ===== 게임 오버 모달 =====
@@ -89,11 +271,18 @@ async function showGameOverModal(winner) {
   );
 }
 
-// ===== 교도소 선택지 모달 =====
+// ===== 무인도/교도소 선택지 모달 (モード別支払額) =====
+// ブルーマーブル: ₩20,000 支払い後次のターンに移動
+// モノポリー: ₩50,000 支払い後即移動
 async function showJailModal(player) {
   const jailName = state.config.jailName;
+  const payAmount = state.mode === 'bluemarble' ? 20000 : 50000;
+  const payLabel  = state.mode === 'bluemarble'
+    ? `${W(payAmount)} 납부 (다음 턴 이동)`
+    : `${W(payAmount)} 납부`;
+
   const buttons = [
-    { label:`${W(50000)} 납부`, cls:'btn-danger', value:'pay' },
+    { label: payLabel,          cls:'btn-danger',    value:'pay'  },
     { label:'주사위로 탈출 시도', cls:'btn-secondary', value:'roll' },
   ];
   if (player.jailCard) {
@@ -588,9 +777,13 @@ async function showAcquisitionModal(player, cell) {
 }
 
 // 인수 비용 계산
+// モの자マーブル: (땅값 + 건물 건설비 합산) × 2
 function getAcquisitionCost(cell) {
-  const sq = boardData[cell.id];
+  const sq         = boardData[cell.id];
   const buildCosts = cell.buildLevel * sq.buildCost;
+  if (state.mode === 'marblemoa') {
+    return (sq.price + buildCosts) * 2;
+  }
   return sq.price + buildCosts;
 }
 
@@ -613,15 +806,14 @@ async function showLoanModal(player) {
   return result === 'loan';
 }
 
-// ===== 강제 인수 알림 모달 (모두의마블) =====
+// ===== 강제 인수 알림 모달 (モの자マーブル / イベントモーダルスタイル) =====
 async function showForcedAcquisitionModal(debtor, creditor, transferredCell) {
   const sq = boardData[transferredCell.id];
-  await showModal(
-    '⚡ 강제 인수',
-    `${debtor.name}의 <strong>${sq.name}</strong>이(가)<br>
-     ${creditor ? creditor.name : '은행'}에 강제 양도됩니다.`,
-    [{ label:'확인', cls:'btn-danger' }]
-  );
+  await showEventModal({
+    icon: '⚡',
+    title: '강제 인수',
+    message: `**${debtor.name}**의 **${sq.name}**이(가)\n**${creditor ? creditor.name : '은행'}**에 강제 양도됩니다.`,
+  });
 }
 
 // ===== 건설 추천 모달 =====
@@ -653,14 +845,14 @@ async function showBuildRecommendModal(player, cell) {
   }
 }
 
-// ===== 세금 모달 =====
+// ===== 세금 모달 (イベントモーダルスタイル) =====
 async function showTaxModal(player, cell) {
   const sq = boardData[cell.id];
-  await showModal(
-    '💰 세금',
-    `<strong>${sq.name}</strong><br>납부액: <span class="modal-highlight">${W(sq.amount)}</span>`,
-    [{ label:'납부', cls:'btn-primary' }]
-  );
+  await showEventModal({
+    icon: '🏛️',
+    title: '세금',
+    message: `**${sq.name}**\n${W(sq.amount)}을 은행에 납부합니다.`,
+  });
 }
 
 // ===== 모두의마블 건설 선택지 모달 =====
@@ -761,6 +953,114 @@ function showMarblemoaBuildModal(player, cell) {
     };
 
     showOptions();
+    document.getElementById('modalBackdrop').classList.add('open');
+  });
+}
+
+// ===== モの자マーブル: 出発マス正確着地時の遠隔建設モーダル =====
+// プレイヤーが所有する建設可能な土地のリストを表示し、1か所選んで建設
+function showRemoteBuildModal(player) {
+  const cfg = state.config;
+  // 랜드마크 미완성, 건설 가능한 내 소유 부지
+  const buildable = state.cells.filter(c =>
+    c.type === 'property' &&
+    c.owner === player.id &&
+    c.buildLevel < 3  // 빌딩(3레벨) 미만만 원격 건설 가능
+  );
+
+  if (buildable.length === 0) {
+    return Promise.resolve(); // 건설 가능한 땅 없으면 스킵
+  }
+
+  return new Promise(resolve => {
+    const titleEl = document.getElementById('modalTitle');
+    const bodyEl  = document.getElementById('modalBody');
+    const btnsEl  = document.getElementById('modalBtns');
+
+    titleEl.textContent = '🏗️ 출발 보너스 — 원격 건설';
+
+    let selectedId = null;
+
+    const render = () => {
+      bodyEl.innerHTML = `
+        <div style="font-size:0.82rem;color:var(--text-muted);text-align:center;margin-bottom:12px">
+          출발점 정확히 착지! 내 땅 중 하나를 골라 원격 건설하세요.
+        </div>
+      `;
+      const list = document.createElement('div');
+      list.className = 'build-list';
+
+      buildable.forEach(cell => {
+        const sq      = boardData[cell.id];
+        const nextLvl = cell.buildLevel + 1;
+        const cost    = sq.buildCost;
+        const afford  = player.money >= cost;
+        const sel     = selectedId === cell.id;
+
+        const item = document.createElement('button');
+        item.className = 'build-item' + (!afford ? ' mortgaged-item' : '');
+        item.disabled  = !afford;
+        item.style.cssText = `border: 2px solid ${sel ? 'var(--accent)' : 'transparent'}; cursor:${afford ? 'pointer' : 'not-allowed'}`;
+
+        const band = document.createElement('div');
+        band.className = 'bi-band';
+        band.style.background = sq.color || '#999';
+
+        const info = document.createElement('div');
+        info.className = 'bi-info';
+        info.innerHTML = `<div class="bi-name">${sq.name}</div>
+          <div class="bi-status">${cfg.buildLabels[cell.buildLevel]} → <strong>${cfg.buildLabels[nextLvl]}</strong>  ${W(cost)}</div>`;
+
+        const icon = document.createElement('div');
+        icon.style.cssText = 'font-size:1.2rem;flex-shrink:0';
+        icon.textContent = sel ? '✅' : (afford ? cfg.buildIcons[nextLvl] || '🏗️' : '💸');
+
+        item.appendChild(band);
+        item.appendChild(info);
+        item.appendChild(icon);
+
+        item.addEventListener('click', () => {
+          selectedId = cell.id;
+          render();
+        });
+        list.appendChild(item);
+      });
+
+      bodyEl.appendChild(list);
+      renderBtns();
+    };
+
+    const renderBtns = () => {
+      btnsEl.innerHTML = '';
+
+      const buildBtn = document.createElement('button');
+      buildBtn.className   = 'btn-primary';
+      buildBtn.textContent = '건설하기';
+      buildBtn.disabled    = selectedId === null;
+      buildBtn.style.cssText = 'flex:1;height:48px';
+      buildBtn.addEventListener('click', () => {
+        if (selectedId !== null) {
+          const targetCell = state.cells[selectedId];
+          if (targetCell) {
+            buildOnCell(player, targetCell);
+            updateCell(selectedId);
+          }
+        }
+        closeModal();
+        resolve();
+      }, { once: true });
+
+      const skipBtn = document.createElement('button');
+      skipBtn.className   = 'btn-secondary';
+      skipBtn.textContent = '건너뛰기';
+      skipBtn.style.cssText = 'flex:1;height:48px';
+      skipBtn.addEventListener('click', () => { closeModal(); resolve(); }, { once: true });
+
+      btnsEl.appendChild(buildBtn);
+      btnsEl.appendChild(skipBtn);
+    };
+
+    render();
     document.getElementById('modalBackdrop').classList.add('open');
   });
 }

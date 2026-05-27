@@ -128,6 +128,7 @@ function startGame(mode, totalPlayers) {
   state.isDoubles      = false;
   state.pendingAction  = null;
   state.doubleRentFlag = false;
+  state.welfareFund    = 0;  // 사회복지기금 적립액
   state.phase          = 'playing';
 
   // DOM構築
@@ -304,13 +305,17 @@ async function forcedAcquisitionProcess(debtor, creditor, debtAmount) {
 async function declareBankruptcy(player, creditor) {
   player.isBankrupt = true;
 
-  // 자산 귀속
+  // 자산 귀속: 부루마블 즉시 파산 처리
+  // 상대 땅에서 파산 → 채권자에게 양도
+  // 은행 관련(세금, 찬스 등) 파산 → 은행으로 귀속 (땅 원상복구)
   state.cells.forEach(c => {
     if (c.owner === player.id) {
       if (creditor && state.config.bankruptMode === 'immediate') {
+        // 채권자에게 모든 자산 양도
         c.owner = creditor.id;
       } else {
-        c.owner     = null;
+        // 은행 귀속: 빈 땅으로 원상복구
+        c.owner      = null;
         c.buildLevel = 0;
         c.mortgaged  = false;
         c.isLandmark = false;
@@ -343,7 +348,18 @@ async function handleLanding(player) {
 
   switch (cell.type) {
     case 'start':
-      // 출발 칸 정확히 착지 보너스 (추가 없음, 통과 시 이미 처리)
+      // 出発マス正確着地: 月給はonPassStartで支給済み。通知モーダル表示
+      if (!player.isAI) {
+        await showEventModal({
+          icon: '💰',
+          title: '월급 수령',
+          message: `출발점에 정확히 착지했습니다!\n**${W(state.config.salaryOnPass)}**을 받았습니다.`,
+        });
+      }
+      // モの자マーブル: 出発正確着地 → 遠隔建設モーダル
+      if (state.mode === 'marblemoa' && !player.isAI) {
+        await showRemoteBuildModal(player);
+      }
       break;
 
     case 'property':
@@ -386,7 +402,31 @@ async function handlePurchasableLanding(player, cell) {
     } else {
       const buying = await showBuyModal(player, cell);
       if (buying) {
+        const buildLevel = (typeof buying === 'object' && buying.buildLevel) ? buying.buildLevel : 0;
+        const sq         = boardData[cell.id];
+        const buildCost  = buildLevel * sq.buildCost;
+        const totalCost  = sq.price + buildCost;
+
+        // 購入確認イベントモーダル
+        await showEventModal({
+          icon: '🏙️',
+          title: '매입 완료',
+          message: `**${sq.name}**을 ${W(sq.price)}에 매입했습니다.` +
+            (buildLevel > 0
+              ? `\n${state.config.buildLabels[buildLevel]} 건설 포함 (-${W(buildCost)})`
+              : ''),
+        });
+
         buyProperty(player, cell);
+
+        // 購入時に選択した建設レベルまで建設実行
+        if (buildLevel > 0) {
+          for (let lvl = 1; lvl <= buildLevel; lvl++) {
+            if (cell.buildLevel < lvl) buildOnCell(player, cell);
+          }
+          renderPlayerPanels();
+          updateCell(cell.id);
+        }
       } else if (state.config.canAuction) {
         await runAuction(cell);
       }
@@ -722,12 +762,16 @@ async function handleJailTurn(player) {
   }
 
   if (action === 'pay') {
-    await transferMoney(player, null, 50000);
+    // ブルーマーブル: ₩20,000 支払い後、このターンは移動しない (次のターンに移動)
+    // モノポリー: ₩50,000 支払い後、即移動
+    const payAmount = state.mode === 'bluemarble' ? 20000 : 50000;
+    await transferMoney(player, null, payAmount);
     if (!player.isBankrupt) {
       player.inJail    = false;
       player.jailTurns = 0;
     }
-    return false;
+    if (state.mode === 'bluemarble') return true; // ターン消費 (次のターンに移動)
+    return false; // モノポリー: このターン続けて移動
   }
 
   // 'skip': AI가 이미 탈출한 경우 (runAiTurn 로직과의 이중처리 방지)
@@ -752,25 +796,49 @@ async function handleJailTurn(player) {
   } else {
     player.jailTurns++;
     if (player.jailTurns >= 3) {
-      // 3턴 후 강제 보석금
-      await transferMoney(player, null, 50000);
-      if (!player.isBankrupt) {
+      if (state.mode === 'bluemarble') {
+        // 無人島: 3ターン経過 → 4ターン目に自動脱出 (支払いなし)
+        if (!player.isAI) {
+          await showEventModal({
+            icon: '🏝️',
+            title: '무인도 자동 탈출',
+            message: `3턴이 경과했습니다.\n자동으로 탈출합니다!`,
+          });
+        }
         player.inJail    = false;
         player.jailTurns = 0;
         await animateTokenMove(player, d1 + d2, onPassStart);
         await handleLanding(player);
+      } else {
+        // モノポリー: 3ターン失敗 → 강제 ₩50,000 납부 후 이동
+        if (!player.isAI) {
+          await showEventModal({
+            icon: '🔒',
+            title: '강제 석방',
+            message: `3턴이 경과했습니다.\n${W(50000)}을 강제 납부하고 이동합니다.`,
+          });
+        }
+        await transferMoney(player, null, 50000);
+        if (!player.isBankrupt) {
+          player.inJail    = false;
+          player.jailTurns = 0;
+          await animateTokenMove(player, d1 + d2, onPassStart);
+          await handleLanding(player);
+        }
       }
     }
   }
 
-  return true; // 교도소 턴 소비 → endTurn
+  return true; // 교도소/무인도 턴 소비 → endTurn
 }
 
-// ===== 출발 통과 콜백 =====
+// ===== 출발 통과 콜백 (アニメーション中に呼ばれる同期関数) =====
+// 月給支給はここで実行 (同期), モーダル表示はhandleLandingの'start'ケースで行う
 function onPassStart(player) {
   player.money += state.config.salaryOnPass;
   if (state.mode === 'bluemarble') player.lapsCompleted++;
   renderPlayerPanels();
+  // 通過通知トースト (ブロッキングしないよう通知のみ)
   showNotification(`🏁 출발 통과! +${W(state.config.salaryOnPass)}`, 'receive', player.color);
 }
 
