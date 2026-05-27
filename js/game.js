@@ -189,31 +189,37 @@ function calcRent(cell, payer) {
 }
 
 // ===== 資金移動 =====
-async function transferMoney(from, to, amount) {
-  if (!from || amount <= 0) return;
-  from.money -= amount;
-  if (to) to.money += amount;
+// skipModal=true: 呼び出し元で既にイベントモーダルを表示した場合に渡す (二重表示防止)
+// from=null: 銀行→プレイヤー 支払い (찬스 카드 bankReceive 等)
+async function transferMoney(from, to, amount, skipModal = false) {
+  if (amount <= 0) return;
+  if (from) from.money -= amount;
+  if (to)   to.money   += amount;
   renderPlayerPanels();
 
-  // 인간 플레이어가 받는 경우 알림 표시
+  // 인간 플레이어가 관련된 경우 이벤트 모달 표시
   const humanPlayer = state.players.find(p => !p.isAI);
-  if (humanPlayer) {
-    if (to && to.id === humanPlayer.id && from.id !== humanPlayer.id) {
-      // 받는 경우
-      const label = from ? `${from.name}에서` : '은행에서';
-      showNotification(`💰 ${label} ${W(amount)} 수령!`, 'receive', '#4ade80');
-    } else if (from.id === humanPlayer.id && to) {
-      // 내는 경우 (AI에게) - 모달 없이 AI 차례에 발생하는 경우
-      if (to.isAI !== false || to.id !== humanPlayer.id) {
-        showNotification(`💸 ${to.name}에게 ${W(amount)} 납부`, 'pay', '#f87171');
-      }
-    } else if (from.id === humanPlayer.id && !to) {
-      // 은행/세금에 납부
-      showNotification(`💸 ${W(amount)} 납부`, 'pay', '#f87171');
+  if (humanPlayer && !skipModal) {
+    if (to && to.id === humanPlayer.id) {
+      // 인간 플레이어가 받는 경우 (상대 or 은행 → 인간)
+      const sender = from ? `**${from.name}**` : '**은행**';
+      await showEventModal({
+        icon: '💰',
+        title: '입금',
+        message: `${sender}에서\n**${W(amount)}**을 받았습니다.`,
+      });
+    } else if (from && from.id === humanPlayer.id) {
+      // 인간 플레이어가 납부하는 경우 (인간 → 상대 or 은행)
+      const recipient = to ? `**${to.name}**` : '**은행**';
+      await showEventModal({
+        icon: '💸',
+        title: '출금',
+        message: `${recipient}에게\n**${W(amount)}**을 납부했습니다.`,
+      });
     }
   }
 
-  if (from.money < 0) {
+  if (from && from.money < 0) {
     await handleInsolvency(from, to, amount);
   }
 }
@@ -238,15 +244,20 @@ async function handleInsolvency(player, creditor, needed) {
       const takeLoan = await showLoanModal(player);
       if (takeLoan) {
         player.loanUsed = true;
-        player.money   += cfg.startMoney;
-        renderPlayerPanels();
+        // 대출 실행 이벤트 모달 표시
+        await showEventModal({
+          icon: '🏦',
+          title: '대출 실행',
+          message: `**${W(cfg.startMoney)}**을 대출받았습니다.\n(게임 당 1회 한도)`,
+        });
+        // 表示済みのため skipModal=true でサイレント追加
+        await transferMoney(null, player, cfg.startMoney, true);
         if (player.money >= 0) return;
       }
     } else if (!player.loanUsed && player.isAI) {
-      // AI는 자동으로 대출
+      // AIは자동으로 대출
       player.loanUsed = true;
-      player.money   += cfg.startMoney;
-      renderPlayerPanels();
+      await transferMoney(null, player, cfg.startMoney, true);
       if (player.money >= 0) return;
     }
 
@@ -370,7 +381,8 @@ async function handleLanding(player) {
 
     case 'tax':
       if (!player.isAI) await showTaxModal(player, cell);
-      await transferMoney(player, null, sq.amount);
+      // showTaxModal で既に表示済みの場合は skipModal=true
+      await transferMoney(player, null, sq.amount, !player.isAI);
       break;
 
     case 'chance':
@@ -499,7 +511,9 @@ async function handlePurchasableLanding(player, cell) {
     const rent = calcRent(cell, player);
     if (rent === 0) return;
     if (!player.isAI) await showRentModal(player, owner, boardData[cell.id].name, rent);
-    await transferMoney(player, owner, rent);
+    // showRentModal で既に表示済み(人間が払う場合)は skipModal=true
+    // AIが払う場合(from=AI, to=人間) は skipModal=false → transferMoney内でモーダル表示
+    await transferMoney(player, owner, rent, !player.isAI);
   }
 }
 
@@ -515,7 +529,8 @@ function buyProperty(player, cell) {
 // ===== 인수 (모두의마블) =====
 async function acquireProperty(player, cell, cost) {
   const oldOwner = state.players.find(p => p.id === cell.owner);
-  await transferMoney(player, oldOwner, cost);
+  // showAcquisitionModal で既に表示済み → skipModal=true
+  await transferMoney(player, oldOwner, cost, true);
   if (player.money >= 0) {
     // 인수 성공
     cell.owner = player.id;
@@ -621,8 +636,8 @@ async function applyChanceCard(player, card) {
       break;
 
     case 'bankReceive':
-      player.money += card.amount;
-      renderPlayerPanels();
+      // 銀行→プレイヤー 送金: transferMoney(null, player) でイベントモーダル表示
+      await transferMoney(null, player, card.amount);
       break;
 
     case 'bankPay':
@@ -727,9 +742,9 @@ async function handleTrade(initiator) {
     return;
   }
 
-  // 거래 실행
-  if (myCash > 0) await transferMoney(initiator, opponent, myCash);
-  if (theirCash > 0) await transferMoney(opponent, initiator, theirCash);
+  // 거래 실행 (거래 모달에서 이미 확인됨 → skipModal=true)
+  if (myCash > 0) await transferMoney(initiator, opponent, myCash, true);
+  if (theirCash > 0) await transferMoney(opponent, initiator, theirCash, true);
 
   myPropIds.forEach(id => {
     state.cells[id].owner = opponent.id;
@@ -818,7 +833,8 @@ async function handleJailTurn(player) {
             message: `3턴이 경과했습니다.\n${W(50000)}을 강제 납부하고 이동합니다.`,
           });
         }
-        await transferMoney(player, null, 50000);
+        // 上のイベントモーダルで既に説明済み → skipModal=true
+        await transferMoney(player, null, 50000, true);
         if (!player.isBankrupt) {
           player.inJail    = false;
           player.jailTurns = 0;
