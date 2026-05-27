@@ -385,7 +385,7 @@ function showBuildModal(player) {
           buildBtn.style.borderColor = '';
         };
 
-        buildBtn.addEventListener('click', () => {
+        buildBtn.addEventListener('click', async () => {
           if (!isConfirming) {
             // 첫 클릭: 확인 요청 상태로 전환
             isConfirming = true;
@@ -403,7 +403,7 @@ function showBuildModal(player) {
             buildBtn.style.background = '';
             buildBtn.style.color = '';
 
-            const cost = buildOnCell(player, cell);
+            const cost = await buildOnCell(player, cell);
             if (cost > 0) {
               const statEl = document.getElementById('bistatus-' + cell.id);
               if (statEl) statEl.textContent = buildGetStatusText(cell);
@@ -839,7 +839,7 @@ async function showBuildRecommendModal(player, cell) {
     ]
   );
   if (result === 'build') {
-    buildOnCell(player, cell);
+    await buildOnCell(player, cell);
     updateCell(cell.id);
     renderPlayerPanels();
   }
@@ -1038,11 +1038,11 @@ function showRemoteBuildModal(player) {
       buildBtn.textContent = '건설하기';
       buildBtn.disabled    = selectedId === null;
       buildBtn.style.cssText = 'flex:1;height:48px';
-      buildBtn.addEventListener('click', () => {
+      buildBtn.addEventListener('click', async () => {
         if (selectedId !== null) {
           const targetCell = state.cells[selectedId];
           if (targetCell) {
-            buildOnCell(player, targetCell);
+            await buildOnCell(player, targetCell);
             updateCell(selectedId);
           }
         }

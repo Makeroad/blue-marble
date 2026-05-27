@@ -305,6 +305,12 @@ async function forcedAcquisitionProcess(debtor, creditor, debtAmount) {
   updateCell(target.id);
   renderPlayerPanels();
 
+  // 채권자 독점 승리 체크 (게임 종료되면 이후 처리 중단)
+  if (creditor && state.mode === 'marblemoa') {
+    await checkMonopolyWinCondition(creditor);
+    if (state.phase !== 'playing') return;
+  }
+
   // 빈손이면 파산
   const remaining = state.cells.filter(c => c.owner === debtor.id);
   if (remaining.length === 0 && debtor.money <= 0) {
@@ -407,7 +413,7 @@ async function handlePurchasableLanding(player, cell) {
     // 미소유 → 구매 제안
     if (player.isAI) {
       if (aiDecideBuy(player, cell)) {
-        buyProperty(player, cell);
+        await buyProperty(player, cell);
       } else if (state.config.canAuction) {
         await runAuction(cell);
       }
@@ -429,12 +435,12 @@ async function handlePurchasableLanding(player, cell) {
               : ''),
         });
 
-        buyProperty(player, cell);
+        await buyProperty(player, cell);
 
         // 購入時に選択した建設レベルまで建設実行
         if (buildLevel > 0) {
           for (let lvl = 1; lvl <= buildLevel; lvl++) {
-            if (cell.buildLevel < lvl) buildOnCell(player, cell);
+            if (cell.buildLevel < lvl) await buildOnCell(player, cell);
           }
           renderPlayerPanels();
           updateCell(cell.id);
@@ -455,7 +461,7 @@ async function handlePurchasableLanding(player, cell) {
         } else {
           const sq = boardData[cell.id];
           if (player.money >= sq.buildCost * 2) {
-            buildOnCell(player, cell);
+            await buildOnCell(player, cell);
             updateCell(cell.id);
           }
         }
@@ -518,12 +524,13 @@ async function handlePurchasableLanding(player, cell) {
 }
 
 // ===== 土地購入 =====
-function buyProperty(player, cell) {
+async function buyProperty(player, cell) {
   if (player.money < cell.price) return;
   player.money  -= cell.price;
   cell.owner     = player.id;
   updateCell(cell.id);
   renderPlayerPanels();
+  if (state.mode === 'marblemoa') await checkMonopolyWinCondition(player);
 }
 
 // ===== 인수 (모두의마블) =====
@@ -536,12 +543,13 @@ async function acquireProperty(player, cell, cost) {
     cell.owner = player.id;
     updateCell(cell.id);
     renderPlayerPanels();
+    if (state.mode === 'marblemoa') await checkMonopolyWinCondition(player);
   }
 }
 
 // ===== 건설 =====
 // 返り値: 지불한 비용 (0 = 건설 안 됨)
-function buildOnCell(player, cell) {
+async function buildOnCell(player, cell) {
   const cfg = state.config;
   const sq  = boardData[cell.id];
 
@@ -557,7 +565,7 @@ function buildOnCell(player, cell) {
     cell.landmarkEligible = false;
     updateCell(cell.id);
     renderPlayerPanels();
-    checkMonopolyWinCondition(player);
+    await checkMonopolyWinCondition(player);
     return cost;
   }
 
@@ -909,6 +917,7 @@ async function executeTurn(player) {
 
   if (player.isBankrupt) {
     state.pendingAction = null;
+    await endTurn();
     return;
   }
 
@@ -960,6 +969,8 @@ async function endTurn() {
 }
 
 // ===== 승리 조건 확인 =====
+// 파산으로 인한 호출: 생존자 1명 이하일 때만 게임 종료
+// 독점 승리(모두의마블)는 buyProperty/acquireProperty/forcedAcquisitionProcess에서 별도 체크
 async function checkWinCondition() {
   if (state.phase !== 'playing') return;
 
@@ -969,17 +980,6 @@ async function checkWinCondition() {
       state.phase = 'gameover';
       await showGameOverModal(active[0]);
     }
-    return;
-  }
-
-  if (state.config.winByMonopoly) {
-    for (const player of active) {
-      if (checkMonopolyWin(player)) {
-        state.phase = 'gameover';
-        await showGameOverModal(player);
-        return;
-      }
-    }
   }
 }
 
@@ -988,10 +988,12 @@ function checkMonopolyWin(player) {
   return checkTripleMonopoly(player) || checkLineMonopoly(player) || checkTourismMonopoly(player);
 }
 
-function checkMonopolyWinCondition(player) {
-  if (state.config.winByMonopoly && checkMonopolyWin(player)) {
+async function checkMonopolyWinCondition(player) {
+  if (!state.config.winByMonopoly || !player || player.isBankrupt) return;
+  if (state.phase !== 'playing') return;
+  if (checkMonopolyWin(player)) {
     state.phase = 'gameover';
-    showGameOverModal(player);
+    await showGameOverModal(player);
   }
 }
 

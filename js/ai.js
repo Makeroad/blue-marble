@@ -52,7 +52,7 @@ async function aiConsiderBuilding(player) {
     for (const cell of myProps) {
       const sq = boardData[cell.id];
       if (player.money > sq.buildCost * 3) {
-        buildOnCell(player, cell);
+        await buildOnCell(player, cell);
         await sleep(300);
       }
     }
@@ -77,7 +77,7 @@ async function aiConsiderBuilding(player) {
       for (const cell of sortedByLevel) {
         const sq = boardData[cell.id];
         if (player.money > sq.buildCost * 2.5) {
-          buildOnCell(player, cell);
+          await buildOnCell(player, cell);
           await sleep(300);
         }
         break; // 한 칸씩만
@@ -90,7 +90,7 @@ async function aiConsiderBuilding(player) {
     for (const cell of myProps) {
       const sq = boardData[cell.id];
       if (player.money > sq.buildCost * 3) {
-        buildOnCell(player, cell);
+        await buildOnCell(player, cell);
         await sleep(200);
       }
     }
